@@ -1,0 +1,183 @@
+/* Focal overrides for react-big-calendar - Premium Dark Mode Default */
+
+.calendar-overrides {
+    --rbc-border-color: hsl(var(--border) / 0.5);
+    /* Extremely subtle lines */
+    --rbc-text-color: hsl(var(--foreground));
+    --rbc-muted-color: hsl(var(--muted-foreground));
+    --rbc-bg-color: transparent;
+    --rbc-primary: hsl(var(--primary));
+    --rbc-hover: hsl(var(--muted) / 0.3);
+}
+
+.calendar-overrides .rbc-month-view,
+.calendar-overrides .rbc-time-view,
+.calendar-overrides .rbc-agenda-view {
+    border-color: var(--rbc-border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: transparent;
+}
+
+.calendar-overrides .rbc-header {
+    border-bottom: 1px solid var(--rbc-border-color);
+    padding: 12px 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    color: var(--rbc-muted-color);
+}
+
+/* Keep vertical borders, but remove horizontal borders in month view rows */
+.calendar-overrides .rbc-month-row+.rbc-month-row {
+    border-color: transparent;
+}
+
+/* Make vertical lines use our custom border color */
+.calendar-overrides .rbc-day-bg+.rbc-day-bg,
+.calendar-overrides .rbc-time-content>*+*>* {
+    border-left-color: var(--rbc-border-color);
+}
+
+.calendar-overrides .rbc-today {
+    background-color: hsl(var(--primary) / 0.05);
+    /* Very subtle today highlight */
+}
+
+.calendar-overrides .rbc-off-range-bg {
+    background-color: hsl(var(--muted) / 0.1);
+}
+
+.calendar-overrides .rbc-event {
+    background: none;
+    border: none;
+    padding: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+/* Remove default gap on right side of events so they stretch fully across the column */
+.calendar-overrides .rbc-day-slot .rbc-events-container {
+    margin-right: 0;
+}
+
+.calendar-overrides .rbc-event-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+/* Hide the default hidden label to prevent it from pushing the custom content down */
+.calendar-overrides .rbc-event-label {
+    display: none;
+}
+
+.calendar-overrides .rbc-event:hover {
+    z-index: 50 !important;
+}
+
+.calendar-overrides .rbc-timeslot-group {
+    border-color: transparent;
+    min-height: 100px;
+    /* Taller cells so 30min events (50px) fully fit their 2 lines of text without expanding */
+}
+
+.calendar-overrides .rbc-time-slot {
+    border-top: 1px dashed hsl(var(--border) / 0.5); /* Faint dashed line for 30 min intervals */
+}
+
+/* Working hour styling via JS will add classes to slots, but we can also use off-range */
+.calendar-overrides .rbc-time-gutter .rbc-timeslot-group {
+    border-color: transparent;
+}
+
+.calendar-overrides .rbc-label {
+    color: var(--rbc-muted-color);
+    font-size: 0.7rem;
+    padding: 0 12px;
+    font-weight: 500;
+}
+
+/* Glowing Current Time Indicator (Red like reference) */
+.calendar-overrides .rbc-current-time-indicator {
+    background-color: #ef4444;
+    height: 2px;
+    z-index: 10;
+    box-shadow: 0 0 4px 1px rgba(239, 68, 68, 0.4);
+}
+
+/* Render the time string on the left edge by offsetting based on the current column index */
+.calendar-overrides .rbc-current-time-indicator::after {
+    content: var(--current-time-string);
+    position: absolute;
+    right: calc((var(--col-index, 0) + 1) * 100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #ef4444;
+    background: hsl(var(--card));
+    padding: 0 4px;
+    border-radius: 4px;
+    white-space: nowrap;
+    text-align: right;
+    z-index: 10;
+}
+
+.calendar-overrides .rbc-day-slot {
+    overflow: visible !important;
+}
+
+/* Fix stacking context so the indicator can be seen over the time gutter */
+.calendar-overrides .rbc-time-gutter+.rbc-day-slot {
+    z-index: 20 !important;
+}
+
+.calendar-overrides .rbc-time-gutter {
+    z-index: 10 !important;
+}
+
+/* Remove the pulsing dot */
+.calendar-overrides .rbc-current-time-indicator::before {
+    display: none;
+}
+
+@keyframes pulse-red {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.3);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.calendar-overrides .rbc-date-cell {
+    padding: 8px 8px;
+    font-weight: 500;
+}
+
+.calendar-overrides .rbc-date-cell.rbc-now {
+    font-weight: bold;
+    color: var(--rbc-primary);
+}
+
+/* Non-working hours shading added via slotPropGetter in JS */
+.non-working-hour {
+    background-color: hsl(var(--muted) / 0.3) !important;
+}
+
+/* Hide all-day cell to move grid closer to days header */
+.calendar-overrides .rbc-allday-cell {
+    display: none;
+}

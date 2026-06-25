@@ -1,0 +1,32 @@
+{
+  "name": "focal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Focal — Your Day, In Focus. AI-powered scheduler for web and mobile.",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:web": "turbo run dev --filter=@verve/web",
+    "dev:mobile": "turbo run dev --filter=@verve/mobile",
+    "dev:api": "turbo run dev --filter=@verve/backend",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "turbo run db:generate --filter=@verve/db",
+    "db:migrate": "turbo run db:migrate --filter=@verve/db",
+    "db:studio": "turbo run db:studio --filter=@verve/db",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0",
+    "prettier": "^3.3.0",
+    "eslint": "^9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

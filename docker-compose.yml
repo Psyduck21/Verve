@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL (mirrors Supabase schema for local dev) ──────
+  postgres:
+    image: postgres:16-alpine
+    container_name: focal-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: focal
+    ports:
+      - '5432:5432'
+    volumes:
+      - focal_postgres_data:/var/lib/postgresql/data
+      - ./packages/db/src/migrations:/docker-entrypoint-initdb.d:z
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis (local rate limiting + caching) ────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: focal-redis
+    ports:
+      - '6379:6379'
+    command: redis-server --save "" --appendonly no --loglevel warning
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  focal_postgres_data:
+    name: focal_postgres_data
+
+# ─────────────────────────────────────────────────────────────
+# Usage:
+#   docker compose up -d          Start both services in background
+#   docker compose down           Stop and remove containers
+#   docker compose down -v        Also remove data volumes (clean slate)
+#   docker compose logs -f        Follow logs
+#
+# Connection strings for local .env.local:
+#   LOCAL_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/focal
+#   LOCAL_REDIS_URL=redis://localhost:6379
+# ─────────────────────────────────────────────────────────────

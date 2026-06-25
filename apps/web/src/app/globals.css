@@ -1,0 +1,260 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   VERVE DESIGN SYSTEM — CSS TOKENS
+   Light mode = Royal Blue accent (#2563EB)
+   Dark mode  = Royal Blue accent (#3B82F6)
+   shadcn/ui CSS variable convention (HSL values, no `hsl()` wrapper)
+   ============================================================ */
+
+:root {
+    /* --- VERVE LIGHT THEME (Cloud-Native Business Platform) --- */
+    --background: 210 20% 94%;
+    /* Darker grey base to increase contrast */
+    --foreground: 0 0% 9%;
+    /* Charcoal primary text */
+
+    /* --- Cards & Modals --- */
+    --card: 0 0% 100%;
+    /* #FFFFFF - Pure white floating panels */
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    /* --- Primary: Royal Blue --- */
+    --primary: 221 83% 53%;
+    /* #2563EB - Brand action color */
+    --primary-foreground: 0 0% 100%;
+
+    /* --- Secondary / Muted --- */
+    --secondary: 210 40% 96%;
+    /* Light gray/blue tint for secondary */
+    --secondary-foreground: 0 0% 9%;
+    --muted: 214 32% 91%;
+    /* Soft gray for inactive elements */
+    --muted-foreground: 215 16% 47%;
+    /* Medium gray for secondary text */
+
+    /* --- Accent / Selection --- */
+    --accent: 214 100% 96%;
+    /* #E6F0FD - Soft Light Blue selection */
+    --accent-foreground: 221 83% 53%;
+    /* Royal Blue text on selection */
+
+    /* --- Functional / Status --- */
+    --destructive: 0 84% 60%;
+    /* Red - Alert / Overdue */
+    --destructive-foreground: 0 0% 100%;
+    --status-todo: 215 16% 47%;
+    /* Gray */
+    --status-progress: 221 83% 53%;
+    /* Soft Blue - Progress */
+    --status-review: 38 92% 50%;
+    /* Golden/Orange - Warning / Medium Priority */
+    --status-done: 142 71% 45%;
+    /* Bright Green - Success / Completed */
+
+    /* --- Borders / Inputs --- */
+    --border: 214 32% 91%;
+    /* Light gray border */
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+    /* Royal Blue focus ring */
+
+    /* --- Radius & Shadows --- */
+    --radius: 0.75rem;
+    /* 12px for generous rounded corners */
+
+    /* --- Sidebar --- */
+    --sidebar-bg: 0 0% 100%;
+    /* White floating sidebar */
+    --sidebar-border: 214 32% 91%;
+    --sidebar-item: 215 16% 47%;
+    --sidebar-item-active: 221 83% 53%;
+
+    /* --- Category Tags --- */
+    --tag-work-bg: 221 83% 90%;
+    --tag-work-text: 221 83% 40%;
+    --tag-personal-bg: 262 83% 90%;
+    --tag-personal-text: 262 83% 40%;
+    --tag-health-bg: 142 71% 90%;
+    --tag-health-text: 142 71% 30%;
+    --tag-learning-bg: 38 92% 90%;
+    --tag-learning-text: 38 92% 40%;
+
+    --surface-dim: 210 20% 96%;
+    --surface-bright: 0 0% 100%;
+    --overlay: 0 0% 0% / 0.4;
+}
+
+.dark {
+    /* Kept as fallback, though design is Light Mode first */
+    --background: 240 6% 6%;
+    --foreground: 0 0% 98%;
+    --card: 240 6% 9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 221 83% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 6% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 6% 12%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 6% 15%;
+    --accent-foreground: 0 0% 98%;
+    /* --- Functional / Status --- */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --status-todo: 240 5% 65%;
+    --status-progress: 221 83% 65%;
+    --status-review: 38 92% 55%;
+    --status-done: 142 71% 55%;
+
+    /* --- Borders / Inputs --- */
+    --border: 240 6% 15%;
+    --input: 240 6% 15%;
+    --ring: 221 83% 65%;
+    --radius: 0.75rem;
+
+    /* --- Sidebar --- */
+    --sidebar-bg: 240 6% 9%;
+    --sidebar-border: 240 6% 15%;
+    --sidebar-item: 240 5% 65%;
+    --sidebar-item-active: 221 83% 65%;
+
+    /* --- Category Tags --- */
+    /* Darker backgrounds with lighter text for contrast */
+    --tag-work-bg: 221 83% 15%;
+    --tag-work-text: 221 83% 75%;
+    --tag-personal-bg: 262 83% 15%;
+    --tag-personal-text: 262 83% 75%;
+    --tag-health-bg: 142 71% 15%;
+    --tag-health-text: 142 71% 70%;
+    --tag-learning-bg: 38 92% 15%;
+    --tag-learning-text: 38 92% 70%;
+
+    --surface-dim: 240 6% 9%;
+    --surface-bright: 240 6% 15%;
+    --overlay: 0 0% 0% / 0.6;
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings: "rlig" 1, "calt" 1;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Smooth scrolling */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Focus visible ring - Enhanced for better visibility */
+    :focus-visible {
+        @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+    }
+
+    /* High contrast focus for keyboard users */
+    *:focus-visible {
+        outline: 3px solid hsl(var(--ring));
+        outline-offset: 2px;
+    }
+
+    /* Remove default focus outline, use custom ring */
+    *:focus {
+        outline: none;
+    }
+
+    /* Focus styles for interactive elements */
+    button:focus-visible,
+    a:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+        outline: 3px solid hsl(var(--ring));
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px hsl(var(--ring) / 0.2);
+    }
+}
+
+/* ============================================================
+   SHIMMER SKELETON ANIMATION
+   ============================================================ */
+@layer utilities {
+    .skeleton {
+        background: linear-gradient(90deg,
+                hsl(var(--muted)) 25%,
+                hsl(var(--muted-foreground) / 0.1) 50%,
+                hsl(var(--muted)) 75%);
+        background-size: 200% 100%;
+        animation: shimmer 2s linear infinite;
+    }
+
+    /* Sidebar state utilities */
+    .sidebar-rail {
+        width: 56px;
+    }
+
+    .sidebar-compact {
+        width: 200px;
+    }
+
+    .sidebar-full {
+        width: 260px;
+    }
+
+    /* Smooth transitions everywhere */
+    .transition-default {
+        @apply transition-all duration-200 ease-in-out;
+    }
+
+    /* Verve stat card gradient accents */
+    .gradient-blue {
+        background: linear-gradient(135deg, hsl(221 83% 53% / 0.15) 0%, hsl(221 83% 53% / 0.05) 100%);
+    }
+
+    .gradient-amber {
+        background: linear-gradient(135deg, hsl(38 92% 50% / 0.15) 0%, hsl(38 92% 50% / 0.05) 100%);
+    }
+
+    .gradient-green {
+        background: linear-gradient(135deg, hsl(142 71% 45% / 0.15) 0%, hsl(142 71% 45% / 0.05) 100%);
+    }
+
+    .gradient-purple {
+        background: linear-gradient(135deg, hsl(262 52% 59% / 0.15) 0%, hsl(262 52% 59% / 0.05) 100%);
+    }
+
+    /* Scrollbar styling */
+    .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: hsl(var(--border)) transparent;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+        background: hsl(var(--border));
+        border-radius: 9999px;
+    }
+
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--muted-foreground));
+    }
+}

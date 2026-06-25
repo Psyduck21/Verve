@@ -1,0 +1,12 @@
+bucket_definitions:
+  user_data:
+    parameters:
+      - request.jwt.claim.sub
+
+    data:
+      - SELECT * FROM routines WHERE user_id = request.jwt.claim.sub
+      - SELECT * FROM tasks WHERE user_id = request.jwt.claim.sub
+      - SELECT * FROM task_recurrences WHERE user_id = request.jwt.claim.sub
+      - SELECT * FROM task_external_metadata WHERE user_id = request.jwt.claim.sub
+      - SELECT * FROM task_completions WHERE user_id = request.jwt.claim.sub
+      - SELECT * FROM tombstones WHERE user_id = request.jwt.claim.sub
