@@ -27,7 +27,7 @@ export function useListNavigation({
         } else if (focusedIndex >= itemCount && itemCount > 0) {
             setFocusedIndex(itemCount - 1)
         }
-    }, [itemCount, focusedIndex])
+    }, [itemCount])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {

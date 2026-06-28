@@ -86,8 +86,8 @@ interface CalendarViewProps {
 
 export default function CalendarView({ selectedDate, onSelectedDateChange }: CalendarViewProps) {
     const [view, setView] = useState<any>(Views.WEEK)
-    const [date, setDate] = useState(new Date())
-    const [currentTime, setCurrentTime] = useState(new Date())
+    const [date, setDate] = useState(() => new Date())
+    const [currentTime, setCurrentTime] = useState(() => new Date())
     const [isPanelOpen, setIsPanelOpen] = useState(true)
     const [activeTab, setActiveTab] = useState<'tasks' | 'timeblocks'>('tasks')
     const [selectedTask, setSelectedTask] = useState<any>(null)
@@ -101,14 +101,13 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
         }
     }, [date])
 
-    const { events } = useEvents({
+    const queryParams = useMemo(() => ({
         start_date: calendarRange.start.toISOString(),
         end_date: calendarRange.end.toISOString(),
-    })
-    const { data: tasks = [] } = useTasks({
-        start_date: calendarRange.start.toISOString(),
-        end_date: calendarRange.end.toISOString(),
-    })
+    }), [calendarRange])
+
+    const { events } = useEvents(queryParams)
+    const { data: tasks = [] } = useTasks(queryParams)
     const { mutate: updateTask } = useUpdateTask()
 
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Plus, Pencil, Trash2, X, Clock, CheckCircle2 } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
@@ -24,7 +24,9 @@ const TIMEBLOCK_COLORS = [
 ]
 
 export function TimeblocksPanel({ className, selectedDate }: TimeblocksPanelProps) {
-    const dateStr = selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+    const dateStr = useMemo(() => {
+        return selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+    }, [selectedDate])
     const { data: timeblocks = [] } = useTimeblocks({ start_date: dateStr, end_date: dateStr })
     const createTimeblock = useCreateTimeblock()
     const updateTimeblock = useUpdateTimeblock()

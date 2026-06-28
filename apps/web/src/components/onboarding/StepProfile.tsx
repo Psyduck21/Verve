@@ -41,6 +41,7 @@ export function StepProfile() {
       wake_time: `${wakeTime.toString().padStart(2, '0')}:00:00`,
       sleep_time: `${sleepTime.toString().padStart(2, '0')}:00:00`,
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timezone, grindType, wakeTime, sleepTime])
 
   const formatTime = (hour: number) => {

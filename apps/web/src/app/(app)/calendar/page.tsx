@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic"
 import { CalendarSkeleton } from "@/components/calendar/CalendarSkeleton"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 
 const CalendarView = dynamic(() => import("@/components/calendar/CalendarView"), {
     ssr: false,
@@ -10,7 +10,7 @@ const CalendarView = dynamic(() => import("@/components/calendar/CalendarView"),
 })
 
 export default function CalendarPage() {
-    const [selectedDate, setSelectedDate] = useState(new Date())
+    const [selectedDate, setSelectedDate] = useState(() => new Date())
 
     return (
         <div className="flex flex-col h-full w-full bg-transparent" data-purpose="calendar-page">

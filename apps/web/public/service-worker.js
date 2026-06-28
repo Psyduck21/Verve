@@ -6,9 +6,9 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll([
         OFFLINE_URL,
-        '/logo.png',
-        // Add more static assets here if needed
-      ]);
+      ]).catch((error) => {
+        console.error('Service worker cache failed:', error);
+      });
     })
   );
   self.skipWaiting();
