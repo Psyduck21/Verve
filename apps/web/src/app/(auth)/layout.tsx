@@ -32,9 +32,9 @@ export default function AuthLayout({
     const isOnboarding = pathname.startsWith('/onboarding')
 
     return (
-        <div className="min-h-screen flex flex-col bg-background">
+        <div className="h-screen flex flex-col bg-background overflow-hidden">
             {/* Minimal Header */}
-            <header className="absolute top-0 left-0 right-0 w-full z-50">
+            <header className="fixed top-0 left-0 right-0 w-full z-50 bg-background/50 backdrop-blur-sm border-b border-border/50 lg:border-none lg:bg-transparent lg:backdrop-blur-none">
                 <div className="flex items-center justify-between px-8 py-6 w-full max-w-[1600px] mx-auto">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-foreground/5 shadow-sm border border-border flex items-center justify-center">
@@ -56,7 +56,7 @@ export default function AuthLayout({
             <main className="flex-1 flex w-full">
                 {/* Left Side: Static Branding — persists across signup + all onboarding steps */}
                 <div className="hidden lg:flex lg:w-1/2 bg-muted flex-col justify-center items-center p-12 relative overflow-hidden sticky top-0 h-screen">
-                    <div className="max-w-md z-10 pt-16">
+                    <div className="max-w-md z-10">
                         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-foreground/5 border border-border mb-8 shadow-xl">
                             <VerveLogo className="w-10 h-10" />
                         </div>
@@ -86,7 +86,7 @@ export default function AuthLayout({
                 </div>
 
                 {/* Right Side: Form / Onboarding steps */}
-                <div className="w-full lg:w-1/2 flex items-start justify-center p-6 sm:p-10 pt-24 bg-card relative z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.02)] overflow-y-auto min-h-screen">
+                <div className="w-full lg:w-1/2 flex items-start justify-center p-6 sm:p-10 pt-24 bg-card relative z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.02)] h-screen overflow-y-auto">
                     <div className="w-full max-w-[460px] pb-12">
                         {children}
                     </div>

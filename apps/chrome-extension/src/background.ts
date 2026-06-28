@@ -4,13 +4,13 @@ const INTEGRATIONS_BASE = 'http://localhost:3001/v1/integrations' // Dev endpoin
 const AI_BASE = 'http://localhost:3001/v1/ai' // Dev endpoint
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === 'SAVE_TO_FOCAL') {
+  if (message.type === 'SAVE_TO_verve') {
     handleSaveToFocal(message.payload)
       .then(res => sendResponse(res))
       .catch(err => sendResponse({ success: false, error: err.message }))
     return true // Keep message channel open for async response
   }
-  
+
   if (message.type === 'EXTRACT_EMAIL_INTENT') {
     handleExtractIntent(message.payload)
       .then(res => sendResponse(res))
@@ -32,7 +32,7 @@ async function handleExtractIntent(payload: { raw_content: string, current_date_
   if (!response.ok) {
     throw new Error(`Failed to extract intent: ${response.statusText}`)
   }
-  
+
   return response.json()
 }
 
