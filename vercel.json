@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd apps/web && pnpm build",
+  "buildCommand": "pnpm --filter=@verve/web build",
   "outputDirectory": "apps/web/.next",
   "framework": "nextjs",
-  "installCommand": "cd apps/web && pnpm install",
-  "devCommand": "cd apps/web && pnpm dev"
+  "installCommand": "pnpm install",
+  "devCommand": "pnpm --filter=@verve/web dev"
 }
