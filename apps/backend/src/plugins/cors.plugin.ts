@@ -16,6 +16,7 @@ export const corsPlugin = fp(async (app: FastifyInstance) => {
         'https://verve.app',
         'https://www.verve.app',
         'https://mail.google.com',
+        'https://verve-ai-native.vercel.app',
       ]
 
       if (process.env.FRONTEND_URL) {
