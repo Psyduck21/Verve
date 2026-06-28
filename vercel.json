@@ -3,6 +3,5 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "pnpm install",
-  "devCommand": "pnpm --filter=@verve/web dev",
-  "rootDirectory": "apps/web"
+  "devCommand": "pnpm --filter=@verve/web dev"
 }
