@@ -8,14 +8,14 @@ function injectFocalButton() {
   // or structure, but for this MVP we'll inject near the "Reply" button container.
 
   const toolbars = document.querySelectorAll('.iH > div')
-  
+
   toolbars.forEach(toolbar => {
     // Check if we already injected to avoid duplicates
     if (toolbar.querySelector('.focal-save-btn')) return
 
     const btn = document.createElement('div')
     btn.className = 'T-I J-J5-Ji T-I-Js-IF focal-save-btn'
-    btn.innerText = 'Save to Focal'
+    btn.innerText = 'Save to verve'
     btn.style.marginLeft = '8px'
     btn.style.backgroundColor = '#000'
     btn.style.color = '#fff'
@@ -28,7 +28,7 @@ function injectFocalButton() {
 
       const subjectEl = document.querySelector('h2.hP')
       const subject = subjectEl ? subjectEl.textContent || 'Untitled Email' : 'Untitled Email'
-      
+
       const bodies = document.querySelectorAll('.a3s')
       const latestBody = bodies.length > 0 ? (bodies[bodies.length - 1] as HTMLElement).innerText || '' : ''
       const raw_content = `Subject: ${subject}\n\n${latestBody}`.replace(/\s+/g, ' ').substring(0, 5000)
@@ -39,18 +39,18 @@ function injectFocalButton() {
       btn.innerText = 'Analyzing...'
       btn.style.opacity = '0.7'
 
-      chrome.runtime.sendMessage({ 
-        type: 'EXTRACT_EMAIL_INTENT', 
-        payload: { raw_content, current_date_time: new Date().toString() } 
+      chrome.runtime.sendMessage({
+        type: 'EXTRACT_EMAIL_INTENT',
+        payload: { raw_content, current_date_time: new Date().toString() }
       }, (aiResponse) => {
         let aiData = {}
         if (!aiResponse?.success) {
-           console.error('Focal AI error:', aiResponse?.error)
-           // Fallback if AI fails
+          console.error('verve AI error:', aiResponse?.error)
+          // Fallback if AI fails
         } else {
-           aiData = aiResponse.data
+          aiData = aiResponse.data
         }
-        
+
         showConfirmationForm(subject, externalId, aiData, raw_content)
       })
     })
@@ -82,7 +82,7 @@ function injectFocalButton() {
       headerRow.style.marginBottom = '4px'
 
       const formLabel = document.createElement('strong')
-      formLabel.innerText = 'Save to Focal'
+      formLabel.innerText = 'Save to verve'
 
       const closeBtn = document.createElement('button')
       closeBtn.type = 'button'
@@ -131,7 +131,7 @@ function injectFocalButton() {
         : '30'
 
       const titleInput = createInput(fallbackTitle)
-      
+
       const descriptionInput = document.createElement('textarea')
       descriptionInput.value = fallbackDescription
       descriptionInput.rows = 2
@@ -192,8 +192,8 @@ function injectFocalButton() {
       formContainer.appendChild(durationInput)
       formContainer.appendChild(submitBtn)
 
-      // Insert relative to button container
-      ;(toolbar as HTMLElement).style.position = 'relative'
+        // Insert relative to button container
+        ; (toolbar as HTMLElement).style.position = 'relative'
       toolbar.appendChild(formContainer)
 
       submitBtn.addEventListener('click', () => {
@@ -214,8 +214,8 @@ function injectFocalButton() {
         }
 
         submitBtn.innerText = 'Saving...'
-        
-        chrome.runtime.sendMessage({ type: 'SAVE_TO_FOCAL', payload }, (response) => {
+
+        chrome.runtime.sendMessage({ type: 'SAVE_TO_verve', payload }, (response) => {
           if (response?.success) {
             btn.innerText = 'Saved ✓'
             btn.style.backgroundColor = '#10B981'
@@ -225,7 +225,7 @@ function injectFocalButton() {
             submitBtn.style.backgroundColor = '#EF4444'
             console.error('Focal extension error:', response?.error)
           }
-          
+
           setTimeout(() => {
             btn.innerText = 'Save to Focal'
             btn.style.backgroundColor = '#000'

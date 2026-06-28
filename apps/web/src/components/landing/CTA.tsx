@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { TypewriterText } from '@/components/ui/TypewriterText'
 
 export function CTA() {
   return (
@@ -27,8 +28,7 @@ export function CTA() {
           </h2>
 
           <p className="text-xl text-primary-foreground/90 max-w-2xl mx-auto">
-            Join thousands of keyboard-first users who are getting more done in less time. 
-            Start your free trial today.
+            <TypewriterText text="Join thousands of keyboard-first users who are getting more done in less time. Start your free trial today." delay={0.2} speed={0.02} />
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">

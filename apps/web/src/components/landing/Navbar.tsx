@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
+import { VerveLogo } from '@/components/ui/VerveLogo'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -29,10 +31,10 @@ export function Navbar() {
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         isScrolled
-          ? 'bg-background/80 backdrop-blur-lg border-b border-border shadow-sm'
-          : 'bg-background/95 backdrop-blur-sm border-b border-border'
+          ? 'bg-background/40 backdrop-blur-xl border-b border-border/50 shadow-sm'
+          : 'bg-transparent border-b border-transparent'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -43,9 +45,9 @@ export function Navbar() {
               <motion.div
                 whileHover={{ rotate: 360 }}
                 transition={{ duration: 0.5 }}
-                className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
+                className="w-8 h-8 flex items-center justify-center"
               >
-                <span className="text-primary-foreground font-bold text-lg">V</span>
+                <VerveLogo className="w-8 h-8" />
               </motion.div>
               <span className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
                 Verve
@@ -73,6 +75,7 @@ export function Navbar() {
 
           {/* Desktop CTA Buttons */}
           <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle />
             <Link
               href="/login"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -152,6 +155,10 @@ export function Navbar() {
                 transition={{ delay: navLinks.length * 0.1 }}
                 className="pt-4 border-t border-border space-y-3"
               >
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm font-medium text-muted-foreground">Theme</span>
+                  <ThemeToggle />
+                </div>
                 <Link
                   href="/login"
                   onClick={() => setIsMobileMenuOpen(false)}

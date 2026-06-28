@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Twitter, Linkedin, Github, Mail } from 'lucide-react'
+import { VerveLogo } from '@/components/ui/VerveLogo'
 
 export function Footer() {
   return (
@@ -10,7 +11,10 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="col-span-2 lg:col-span-1">
-            <h3 className="text-lg font-bold text-foreground mb-4">Verve</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <VerveLogo className="w-6 h-6" />
+              <h3 className="text-lg font-bold text-foreground">Verve</h3>
+            </div>
             <p className="text-sm text-muted-foreground mb-4">
               Zero-click productivity for keyboard-first workflows.
             </p>

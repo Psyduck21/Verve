@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { Check, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { TypewriterText } from '@/components/ui/TypewriterText'
 
 const plans = [
   {
@@ -64,7 +65,7 @@ export function Pricing() {
             Simple, transparent pricing
           </h2>
           <p className="text-lg text-muted-foreground">
-            Start free, upgrade when you're ready. No hidden fees, no surprises.
+            <TypewriterText text="Start free, upgrade when you're ready. No hidden fees, no surprises." delay={0.2} speed={0.02} />
           </p>
         </div>
 
