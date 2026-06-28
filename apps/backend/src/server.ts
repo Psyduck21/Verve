@@ -17,7 +17,7 @@ const requiredEnvVars = [
 
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName])
 if (process.env.NODE_ENV === 'production' && !process.env.SENTRY_DSN) {
-  missingVars.push('SENTRY_DSN')
+  console.warn('⚠️ SENTRY_DSN is not set. Error tracking will be disabled.')
 }
 
 if (missingVars.length > 0) {
