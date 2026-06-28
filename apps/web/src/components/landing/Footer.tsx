@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { Twitter, Linkedin, Github, Mail } from 'lucide-react'
+import { X, Link as LinkIcon, GitBranch, Mail } from 'lucide-react'
 import { VerveLogo } from '@/components/ui/VerveLogo'
 
 export function Footer() {
@@ -20,13 +20,13 @@ export function Footer() {
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Twitter size={20} />
+                <X size={20} />
               </a>
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Linkedin size={20} />
+                <LinkIcon size={20} />
               </a>
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Github size={20} />
+                <GitBranch size={20} />
               </a>
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
                 <Mail size={20} />
