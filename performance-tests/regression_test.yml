@@ -1,0 +1,49 @@
+config:
+  target: "http://127.0.0.1:3001"
+  phases:
+    - duration: 30
+      arrivalRate: 5
+      name: "Baseline regression"
+  environments:
+    local:
+      target: "http://127.0.0.1:3001"
+    staging:
+      target: "https://staging-api.yourdomain.com"
+    production:
+      target: "https://api.yourdomain.com"
+scenarios:
+  - name: "Dashboard fetch flow"
+    weight: 5
+    flow:
+      - get:
+          url: "/v1/dashboard/summary"
+          headers:
+            authorization: "Bearer {{ $processEnvironment.TOKEN }}"
+      - get:
+          url: "/v1/categories"
+          headers:
+            authorization: "Bearer {{ $processEnvironment.TOKEN }}"
+  - name: "Tasks list flow"
+    weight: 3
+    flow:
+      - get:
+          url: "/v1/tasks?limit=50&page=1"
+          headers:
+            authorization: "Bearer {{ $processEnvironment.TOKEN }}"
+  - name: "Create task flow"
+    weight: 1
+    flow:
+      - post:
+          url: "/v1/tasks"
+          headers:
+            authorization: "Bearer {{ $processEnvironment.TOKEN }}"
+            content-type: "application/json"
+          json:
+            title: "Load Test Task {{ $randomString() }}"
+            priority: "medium"
+            estimated_duration_minutes: 30
+  - name: "Public health check"
+    weight: 1
+    flow:
+      - get:
+          url: "/health/detailed"

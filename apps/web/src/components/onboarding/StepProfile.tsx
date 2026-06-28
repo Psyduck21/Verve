@@ -41,7 +41,7 @@ export function StepProfile() {
       wake_time: `${wakeTime.toString().padStart(2, '0')}:00:00`,
       sleep_time: `${sleepTime.toString().padStart(2, '0')}:00:00`,
     })
-  }, [timezone, grindType, wakeTime, sleepTime, updateData])
+  }, [timezone, grindType, wakeTime, sleepTime])
 
   const formatTime = (hour: number) => {
     const period = hour >= 12 ? "PM" : "AM"

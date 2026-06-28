@@ -2,6 +2,7 @@ import { db } from '../../lib/db'
 import { tasks, routines, tombstones, taskRecurrences, taskExternalMetadata } from '@verve/db'
 import { eq, and, desc } from '@verve/db'
 import { z } from 'zod'
+import { redis, RedisKeys } from '../../lib/redis'
 
 export const CreateSubtaskSchema = z.object({
   title: z.string().min(1).max(200),
@@ -9,22 +10,44 @@ export const CreateSubtaskSchema = z.object({
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   status: z.enum(['not_started', 'in_progress', 'completed', 'missed', 'cancelled']).optional(),
   estimated_duration_minutes: z.number().min(5).max(480).optional(),
-  scheduled_at: z.string().datetime({ offset: true }).optional(),
+  scheduled_at: z.string().datetime({ offset: true }).nullable().optional(),
 })
 
 export type CreateSubtaskInput = z.infer<typeof CreateSubtaskSchema>
 
 export class TasksService {
+  private static async invalidateDashboardSummaries(userId: string, dates: Array<string | Date | null | undefined>) {
+    const uniqueKeys = new Set(
+      dates
+        .filter((date): date is string | Date => Boolean(date))
+        .map((date) => RedisKeys.dashboardSummary(userId, date))
+    )
+
+    await Promise.all([...uniqueKeys].map((key) => redis.del(key)))
+  }
+
   static async createTask(userId: string, taskData: any) {
     let routineId = taskData.routine_id
     if (!routineId) {
-      let userRoutines = await db.select().from(routines).where(eq(routines.user_id, userId)).limit(1)
-      if (!userRoutines.length) {
-        userRoutines = await db.insert(routines).values({ user_id: userId, title: 'Default Routine' }).returning()
+      const userRoutines = await db
+        .select({ id: routines.id })
+        .from(routines)
+        .where(eq(routines.user_id, userId))
+        .limit(1)
+      if (userRoutines.length) {
+        routineId = userRoutines[0].id
+      } else {
+        const [newRoutine] = await db
+          .insert(routines)
+          .values({ user_id: userId, title: 'Default Routine' })
+          .returning({ id: routines.id })
+        routineId = newRoutine.id
       }
-      routineId = userRoutines[0].id
     } else {
-      const routine = await db.select().from(routines).where(and(eq(routines.id, routineId), eq(routines.user_id, userId)))
+      const routine = await db
+        .select({ id: routines.id })
+        .from(routines)
+        .where(and(eq(routines.id, routineId), eq(routines.user_id, userId)))
       if (!routine.length) {
         throw new Error('Invalid routine_id or unauthorized')
       }
@@ -43,11 +66,11 @@ export class TasksService {
     const payload = {
       ...coreTaskData,
       routine_id: routineId,
-      scheduled_at: new Date(taskData.scheduled_at),
+      scheduled_at: taskData.scheduled_at ? new Date(taskData.scheduled_at) : null,
       user_id: userId
     }
 
-    return await db.transaction(async (tx) => {
+    const createdTask = await db.transaction(async (tx) => {
       const result = await tx.insert(tasks).values(payload).returning()
       const createdTask = result[0]
 
@@ -73,6 +96,9 @@ export class TasksService {
 
       return createdTask
     })
+
+    await this.invalidateDashboardSummaries(userId, [createdTask.scheduled_at])
+    return createdTask
   }
 
   static async updateTask(userId: string, taskId: string, updates: any) {
@@ -90,11 +116,14 @@ export class TasksService {
       ...coreUpdates,
       updated_at: new Date()
     }
-    if (coreUpdates.scheduled_at) {
-      updatePayload.scheduled_at = new Date(coreUpdates.scheduled_at)
+    if (coreUpdates.scheduled_at !== undefined) {
+      updatePayload.scheduled_at = coreUpdates.scheduled_at ? new Date(coreUpdates.scheduled_at) : null
     }
 
-    return await db.transaction(async (tx) => {
+    const existingTask = await db.select({ scheduled_at: tasks.scheduled_at }).from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.user_id, userId))).limit(1)
+    const previousScheduledAt = existingTask[0]?.scheduled_at
+
+    const updatedTask = await db.transaction(async (tx) => {
       const result = await tx
         .update(tasks)
         .set(updatePayload)
@@ -145,6 +174,9 @@ export class TasksService {
 
       return updatedTask
     })
+
+    await this.invalidateDashboardSummaries(userId, [previousScheduledAt, updatedTask.scheduled_at])
+    return updatedTask
   }
 
   static async deleteTask(userId: string, taskId: string) {
@@ -169,6 +201,7 @@ export class TasksService {
       throw new Error('Task not found or unauthorized')
     }
 
+    await this.invalidateDashboardSummaries(userId, [result[0].scheduled_at])
     return result[0]
   }
 
@@ -207,7 +240,7 @@ export class TasksService {
         priority: input.priority || parentTask.priority,
         status: 'not_started',
         category: parentTask.category,
-        scheduled_at: input.scheduled_at ? new Date(input.scheduled_at) : parentTask.scheduled_at,
+        scheduled_at: input.scheduled_at !== undefined ? (input.scheduled_at ? new Date(input.scheduled_at) : null) : parentTask.scheduled_at,
         estimated_duration_minutes: input.estimated_duration_minutes || 15,
         order_index: nextOrderIndex,
       })
@@ -260,7 +293,7 @@ export class TasksService {
     if (updates.priority !== undefined) updateData.priority = updates.priority
     if (updates.status !== undefined) updateData.status = updates.status
     if (updates.estimated_duration_minutes !== undefined) updateData.estimated_duration_minutes = updates.estimated_duration_minutes
-    if (updates.scheduled_at !== undefined) updateData.scheduled_at = new Date(updates.scheduled_at)
+    if (updates.scheduled_at !== undefined) updateData.scheduled_at = updates.scheduled_at ? new Date(updates.scheduled_at) : null
 
     const [updated] = await db
       .update(tasks)

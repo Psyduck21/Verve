@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "idx_tasks_user_scheduled_parent" ON "tasks" USING btree ("user_id","scheduled_at","parent_task_id");

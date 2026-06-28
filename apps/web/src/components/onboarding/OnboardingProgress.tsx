@@ -1,6 +1,5 @@
 "use client"
 
-import { motion } from "framer-motion"
 import { useOnboarding } from "@/contexts/onboarding-context"
 
 const TOTAL_STEPS = 7
@@ -13,14 +12,14 @@ export function OnboardingProgress() {
   return (
     <div className="space-y-3">
       {/* Progress Bar */}
-      <div className="h-1.5 w-full bg-border/50 rounded-full overflow-hidden">
+      {/* <div className="h-1.5 w-full bg-border/50 rounded-full overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progressPercentage}%` }}
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="h-full bg-primary rounded-full"
         />
-      </div>
+      </div> */}
 
       {/* Step Indicators */}
       <div className="flex items-center justify-between gap-1">

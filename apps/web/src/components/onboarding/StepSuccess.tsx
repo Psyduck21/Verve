@@ -1,18 +1,22 @@
 "use client"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useOnboarding } from "@/contexts/onboarding-context"
 import { CheckCircle2, Sparkles, Calendar, ArrowRight, Home } from "lucide-react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 
-export function StepSuccess() {
-  const router = useRouter()
+interface StepSuccessProps {
+  onComplete?: () => void
+}
+
+export function StepSuccess({ onComplete }: StepSuccessProps) {
   const { collectedData } = useOnboarding()
 
   const handleGoToDashboard = () => {
-    router.push('/dashboard')
+    if (onComplete) {
+      onComplete()
+    }
   }
 
   return (
@@ -55,7 +59,7 @@ export function StepSuccess() {
             <div>
               <span className="font-semibold text-sm block">AI-Powered Schedule</span>
               <span className="text-xs text-muted-foreground">
-                {collectedData.generated_routine?.length || 0} tasks generated for tomorrow
+                {collectedData.generated_routines?.length || 0} routines generated for tomorrow
               </span>
             </div>
           </div>

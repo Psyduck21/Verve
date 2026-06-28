@@ -5,14 +5,16 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Mail, Video, CheckCircle2, Search, Filter } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import { cn } from "@/lib/utils"
-import { useTasks } from "@/hooks/useTasks"
+import { useTasks, Task, useUpdateTask, useDeleteTask } from "@/hooks/useTasks"
+import { useListNavigation } from "@/hooks/useListNavigation"
 import { EditTaskModal } from "@/components/tasks/EditTaskModal"
 
 export function InboxContent({ user }: { user?: any }) {
     const [inboxTab, setInboxTab] = useState("all")
     const [editTask, setEditTask] = useState<any | null>(null)
-    const [focusedIndex, setFocusedIndex] = useState(-1)
     const { data: tasks = [] } = useTasks()
+    const { mutate: updateTask } = useUpdateTask()
+    const { mutate: deleteTask } = useDeleteTask()
 
     const sortedTasks = useMemo(() => {
         const priorityWeight = { critical: 4, high: 3, medium: 2, low: 1 }
@@ -22,6 +24,10 @@ export function InboxContent({ user }: { user?: any }) {
         if (inboxTab === "meetings") filtered = tasks.filter(t => t.external_provider === 'zoom' || t.external_provider === 'google_calendar')
 
         return [...filtered].sort((a, b) => {
+            if (!a.scheduled_at && !b.scheduled_at) return 0
+            if (!a.scheduled_at) return 1
+            if (!b.scheduled_at) return -1
+            
             const dA = new Date(a.scheduled_at)
             const dB = new Date(b.scheduled_at)
 
@@ -41,26 +47,14 @@ export function InboxContent({ user }: { user?: any }) {
         })
     }, [tasks, inboxTab])
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (editTask) return;
-            if (sortedTasks.length === 0) return;
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                setFocusedIndex(prev => (prev < sortedTasks.length - 1 ? prev + 1 : prev))
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                setFocusedIndex(prev => (prev > 0 ? prev - 1 : prev))
-            } else if ((e.key === 'Enter' || e.key === 'e') && focusedIndex >= 0) {
-                e.preventDefault()
-                setEditTask(sortedTasks[focusedIndex])
-            }
-        }
-
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [sortedTasks, focusedIndex, editTask])
+    const { focusedIndex, setFocusedIndex } = useListNavigation({
+        itemCount: sortedTasks.length,
+        disabled: !!editTask,
+        onSelect: (index) => setEditTask(sortedTasks[index]),
+        onUnschedule: (index) => updateTask({ id: sortedTasks[index].id, scheduled_at: null }),
+        onDelete: (index) => deleteTask(sortedTasks[index].id),
+        initialIndex: -1,
+    })
 
     const getPriorityColor = (priority: string) => {
         switch (priority) {
@@ -85,7 +79,7 @@ export function InboxContent({ user }: { user?: any }) {
                                     className={cn(
                                         "px-4 py-2 text-sm font-bold rounded-lg transition-colors",
                                         inboxTab === tab
-                                            ? "bg-white text-foreground shadow-sm"
+                                            ? "bg-card text-foreground shadow-sm"
                                             : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
@@ -108,11 +102,11 @@ export function InboxContent({ user }: { user?: any }) {
                                         key={item.id}
                                         onClick={() => setEditTask(item)}
                                         className={cn(
-                                            "flex items-center gap-4 p-4 rounded-2xl border bg-white dark:bg-white/5 shadow-sm hover:shadow-md hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 group cursor-pointer",
+                                            "flex items-center gap-4 p-4 rounded-2xl border bg-card shadow-sm hover:shadow-md hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 group cursor-pointer",
                                             i === focusedIndex ? "border-primary ring-2 ring-primary/20" : "border-border"
                                         )}
                                     >
-                                        <div className="p-3 rounded-xl bg-white text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors border border-border">
+                                        <div className="p-3 rounded-xl bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors border border-border">
                                             <Icon icon={item.external_provider === 'zoom' ? Video : item.external_provider === 'gmail' ? Mail : CheckCircle2} size="md" />
                                         </div>
                                         <div className="flex-1 min-w-0">
@@ -127,8 +121,14 @@ export function InboxContent({ user }: { user?: any }) {
                                             </div>
                                         </div>
                                         <div className="text-sm font-bold text-muted-foreground whitespace-nowrap text-right">
-                                            <div>{new Date(item.scheduled_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</div>
-                                            <div className="text-xs">{new Date(item.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                            {item.scheduled_at ? (
+                                                <div>{new Date(item.scheduled_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</div>
+                                            ) : (
+                                                <div>Unscheduled</div>
+                                            )}
+                                            {item.scheduled_at && (
+                                                <div className="text-xs">{new Date(item.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                            )}
                                         </div>
                                     </div>
                                 ))

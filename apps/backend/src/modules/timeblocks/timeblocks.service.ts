@@ -1,4 +1,5 @@
-import { db, timeBlocks } from '@verve/db'
+import { db } from '../../lib/db'
+import { timeBlocks } from '@verve/db'
 import { eq, and, gte, lte, desc } from '@verve/db'
 import { z } from 'zod'
 
@@ -114,12 +115,11 @@ export class TimeBlocksService {
     const startTime = input.start_time ? new Date(input.start_time) : existing.start_time
     const endTime = input.end_time ? new Date(input.end_time) : existing.end_time
 
-    // Validate time range if both times are provided
-    if (input.start_time && input.end_time && endTime <= startTime) {
+    // Validate time range after applying any updated values
+    if (endTime <= startTime) {
       throw new Error('End time must be after start time')
     }
 
-    // Check for conflicts (excluding current block)
     const conflicts = await this.detectConflicts(userId, startTime, endTime, id)
     if (conflicts.length > 0) {
       throw new Error(`Time block conflicts with ${conflicts.length} existing block(s)`)
@@ -170,14 +170,14 @@ export class TimeBlocksService {
       .insert(tasks)
       .values({
         user_id: userId,
-        routine_id: null,
+        routine_id: undefined,
         title: block.label || 'Time Block Task',
         description: `Created from time block (${block.start_time.toISOString()} - ${block.end_time.toISOString()})`,
         priority: 'medium',
         status: 'not_started',
-        category: null,
+        category: undefined,
         scheduled_at: block.start_time,
-        estimated_duration_minutes: duration,
+        estimated_duration_minutes: durationMinutes,
       })
       .returning()
 
@@ -187,9 +187,6 @@ export class TimeBlocksService {
       .set({ task_id: task.id })
       .where(eq(timeBlocks.id, id))
       .returning()
-
-    // Delete the time block
-    await db.delete(timeBlocks).where(eq(timeBlocks.id, id))
 
     return { task, deletedBlock: updatedBlock }
   }
@@ -211,17 +208,14 @@ export class TimeBlocksService {
     const conflicts = await db
       .select()
       .from(timeBlocks)
-      .where(
-        and(
-          ...conditions,
-          excludeId ? eq(timeBlocks.id, excludeId) : undefined
-        )
-      )
+      .where(and(...conditions))
 
-    // Filter for actual overlaps in JavaScript
+    // Filter for actual overlaps in JavaScript and exclude the current block if needed.
     return conflicts.filter(
       (block) =>
-        block.start_time < endTime && block.end_time > startTime
+        block.id !== excludeId &&
+        block.start_time < endTime &&
+        block.end_time > startTime
     )
   }
 

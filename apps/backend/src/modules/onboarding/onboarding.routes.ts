@@ -1,9 +1,22 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { db } from '../../lib/db'
-import { users, onboardingAnalytics } from '@verve/db'
-import { eq } from '@verve/db'
+import { users, onboardingAnalytics, routines, tasks } from '@verve/db'
+import { and, eq, sql } from '@verve/db'
 import { OnboardingService } from './onboarding.service'
+
+function deriveFullName(email?: string, userMetadata?: Record<string, any>) {
+  return userMetadata?.full_name
+    || userMetadata?.name
+    || email?.split('@')[0]
+    || 'User'
+}
+
+type AuthenticatedUser = {
+  id: string
+  email?: string
+  user_metadata?: Record<string, any>
+}
 
 const OnboardingStepSchema = z.object({
   step: z.number().min(1).max(7),
@@ -34,12 +47,45 @@ const CompleteOnboardingSchema = z.object({
   completed_at: z.string().optional(),
   total_duration_ms: z.number().optional(),
   skipped_steps: z.array(z.number()).optional(),
+  accepted_routine: z.object({
+    title: z.string().min(1).max(100),
+    goal: z.string().max(200).optional(),
+    icon: z.string().optional(),
+    color: z.string().optional(),
+    tasks: z.array(z.object({
+      title: z.string().min(1).max(200),
+      priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+      estimated_duration_minutes: z.number().int().min(5).max(480).optional(),
+      category: z.string().optional(),
+    })).optional(),
+  }).optional(),
+  challenge: z.string().optional(),
+  buffer_preference: z.string().optional(),
+  skipped_integrations: z.array(z.string()).optional(),
+  first_task_created: z.boolean().optional(),
+  first_task_title: z.string().optional(),
 })
 
 export const onboardingRoutes: FastifyPluginAsync = async (app) => {
+  async function ensureLocalUser(user: AuthenticatedUser) {
+    const existingUser = await db.select({ id: users.id }).from(users).where(eq(users.id, user.id))
+
+    if (!existingUser.length) {
+      await db.insert(users).values({
+        id: user.id,
+        email: user.email || `${user.id}@example.local`,
+        full_name: deriveFullName(user.email, user.user_metadata),
+        onboarding_completed: false,
+        onboarding_step: 0,
+        ai_requests_used_today: 0,
+      })
+    }
+  }
+
   // GET /v1/onboarding/status
   app.get('/status', { preHandler: [app.authenticate] }, async (req, reply) => {
     const user = req.user!
+    await ensureLocalUser(user)
     
     const profile = await db.select({
       onboarding_step: users.onboarding_step,
@@ -82,8 +128,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // POST /v1/onboarding/step/:number
-  app.post('/step/:number', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/step/:number', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
+    await ensureLocalUser(user)
     const stepNumber = parseInt((req.params as { number: string }).number)
     
     const body = req.body as any
@@ -128,8 +175,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // POST /v1/onboarding/generate-routine
-  app.post('/generate-routine', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/generate-routine', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
+    await ensureLocalUser(user)
     
     const parsed = GenerateRoutineSchema.safeParse(req.body)
     
@@ -149,8 +197,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // POST /v1/onboarding/complete
-  app.post('/complete', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/complete', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
+    await ensureLocalUser(user)
     
     const parsed = CompleteOnboardingSchema.safeParse(req.body)
     
@@ -158,34 +207,126 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ success: false, error: parsed.error.issues })
     }
 
-    const { completed_at, total_duration_ms, skipped_steps } = parsed.data
+    const {
+      completed_at,
+      total_duration_ms,
+      skipped_steps,
+      accepted_routine,
+      challenge,
+      buffer_preference,
+      skipped_integrations,
+      first_task_created,
+      first_task_title,
+    } = parsed.data
 
-    // Log completion analytics
-    await db.insert(onboardingAnalytics).values({
-      user_id: user.id,
-      step_number: 7,
-      action: 'completed',
-      duration_ms: total_duration_ms,
-      metadata: { skipped_steps },
-    })
+    const updated = await db.transaction(async (tx) => {
+      const [profile] = await tx.select({
+        onboarding_completed: users.onboarding_completed,
+      }).from(users).where(eq(users.id, user.id))
 
-    // Update user
-    const updated = await db.update(users)
-      .set({
-        onboarding_completed: true,
-        onboarding_step: 7,
-        onboarding_completed_at: completed_at ? new Date(completed_at) : new Date(),
-        onboarding_skipped_steps: skipped_steps || [],
+      const alreadyCompleted = Boolean(profile?.onboarding_completed)
+
+      await tx.insert(onboardingAnalytics).values({
+        user_id: user.id,
+        step_number: 7,
+        action: 'completed',
+        duration_ms: total_duration_ms,
+        metadata: {
+          skipped_steps,
+          skipped_integrations,
+          challenge,
+          buffer_preference,
+          accepted_routine_tasks: accepted_routine?.tasks?.length || 0,
+          first_task_created,
+        },
       })
-      .where(eq(users.id, user.id))
-      .returning()
+
+      if (!alreadyCompleted && (accepted_routine || (first_task_created && first_task_title?.trim()))) {
+        const [existingRoutine] = await tx.select()
+          .from(routines)
+          .where(and(eq(routines.user_id, user.id), eq(routines.title, accepted_routine?.title || 'Onboarding Routine')))
+          .limit(1)
+
+        const onboardingRoutineId = existingRoutine
+          ? existingRoutine.id
+          : (await tx.insert(routines).values({
+              user_id: user.id,
+              title: accepted_routine?.title || 'Onboarding Routine',
+              goal: accepted_routine?.goal || 'Tasks created during onboarding',
+              icon: accepted_routine?.icon,
+              color: accepted_routine?.color || '#3b82f6',
+              is_active: true,
+              is_default: true, // Setting as default for the new user!
+              sort_order: -1,
+              ai_generated_at: accepted_routine ? new Date() : null,
+            }).returning({ id: routines.id }))[0].id
+
+        if (accepted_routine?.tasks?.length) {
+          // Unset other defaults just in case, though they are new
+          await tx.update(routines).set({ is_default: false }).where(and(eq(routines.user_id, user.id), sql`${routines.id} != ${onboardingRoutineId}`))
+
+          // Create tasks from the routine
+          const tomorrow = new Date()
+          tomorrow.setDate(tomorrow.getDate() + 1)
+          tomorrow.setHours(9, 0, 0, 0)
+          let currentMinutes = 0
+          
+          await tx.insert(tasks).values(accepted_routine.tasks.map((task) => {
+            const scheduled_at = new Date(tomorrow)
+            scheduled_at.setMinutes(scheduled_at.getMinutes() + currentMinutes)
+            currentMinutes += (task.estimated_duration_minutes || 30)
+
+            return {
+              user_id: user.id,
+              routine_id: onboardingRoutineId,
+              title: task.title,
+              priority: task.priority || 'medium',
+              status: 'not_started' as const,
+              category: task.category || 'onboarding',
+              scheduled_at,
+              estimated_duration_minutes: task.estimated_duration_minutes || 30,
+              ai_context: 'onboarding_generated_routine',
+            }
+          }))
+        }
+
+        if (first_task_created && first_task_title?.trim()) {
+          const tomorrow = new Date()
+          tomorrow.setDate(tomorrow.getDate() + 1)
+          tomorrow.setHours(9, 0, 0, 0)
+
+          await tx.insert(tasks).values({
+            user_id: user.id,
+            routine_id: onboardingRoutineId,
+            title: first_task_title.trim(),
+            priority: 'medium',
+            status: 'not_started',
+            category: 'onboarding',
+            scheduled_at: tomorrow,
+            estimated_duration_minutes: 30,
+            ai_context: 'onboarding_first_task',
+          })
+        }
+      }
+
+      return tx.update(users)
+        .set({
+          onboarding_completed: true,
+          onboarding_step: 7,
+          onboarding_completed_at: completed_at ? new Date(completed_at) : new Date(),
+          onboarding_skipped_steps: skipped_steps || [],
+        })
+        .where(eq(users.id, user.id))
+        .returning()
+    })
 
     return reply.send({ success: true, data: updated[0] })
   })
 
   // POST /v1/onboarding/skip
-  app.post('/skip', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/skip', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
+    await ensureLocalUser(user)
     const { skip_from_step, reason } = req.body as { skip_from_step?: number, reason?: string }
 
     const profile = await db.select({
@@ -230,8 +371,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // POST /v1/onboarding/reset (Admin only or after 7 days)
-  app.post('/reset', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/reset', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
+    await ensureLocalUser(user)
 
     // Check if user can reset (e.g., after 7 days of completion)
     const profile = await db.select({

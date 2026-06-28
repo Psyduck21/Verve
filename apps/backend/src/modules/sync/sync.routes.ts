@@ -15,42 +15,50 @@ export const syncRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ success: false, error: 'Too many mutations. Max 500 per request.' })
     }
 
-    // Process sequentially inside a transaction to ensure integrity
-    await db.transaction(async (tx) => {
-      for (const mutation of body.mutations) {
-        const { table, operation, record } = mutation
-        const rec = record as any
+    try {
+      // Process sequentially inside a transaction to ensure integrity
+      await db.transaction(async (tx) => {
+        for (const mutation of body.mutations) {
+          const { table, operation, record } = mutation
+          const rec = record as any
 
-        if (operation === 'DELETE') {
-          // Add tombstone
-          await tx.insert(tombstones).values({
-            user_id: user.id,
-            table_name: table,
-            record_id: rec.id,
-            deleted_by_session_id: null,
-          }).onConflictDoNothing()
+          if (operation === 'DELETE') {
+            // Add tombstone
+            await tx.insert(tombstones).values({
+              user_id: user.id,
+              table_name: table,
+              record_id: rec.id,
+              deleted_by_session_id: null,
+            }).onConflictDoNothing()
 
-          // Delete actual record
-          if (table === 'tasks') await tx.delete(tasks).where(and(eq(tasks.id, rec.id), eq(tasks.user_id, user.id)))
-          if (table === 'routines') await tx.delete(routines).where(and(eq(routines.id, rec.id), eq(routines.user_id, user.id)))
-          if (table === 'task_completions') await tx.delete(taskCompletions).where(and(eq(taskCompletions.id, rec.id), eq(taskCompletions.user_id, user.id)))
-        } else {
-          // INSERT or UPDATE (upsert)
-          if (table === 'tasks') {
-            await tx.insert(tasks).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: tasks.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(tasks.user_id, user.id) })
-          }
-          if (table === 'routines') {
-            await tx.insert(routines).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: routines.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(routines.user_id, user.id) })
-          }
-          if (table === 'task_completions') {
-            await tx.insert(taskCompletions).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: taskCompletions.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(taskCompletions.user_id, user.id) })
+            // Delete actual record
+            if (table === 'tasks') await tx.delete(tasks).where(and(eq(tasks.id, rec.id), eq(tasks.user_id, user.id)))
+            if (table === 'routines') await tx.delete(routines).where(and(eq(routines.id, rec.id), eq(routines.user_id, user.id)))
+            if (table === 'task_completions') await tx.delete(taskCompletions).where(and(eq(taskCompletions.id, rec.id), eq(taskCompletions.user_id, user.id)))
+          } else {
+            // INSERT or UPDATE (upsert)
+            if (table === 'tasks') {
+              await tx.insert(tasks).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: tasks.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(tasks.user_id, user.id) })
+            }
+            if (table === 'routines') {
+              await tx.insert(routines).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: routines.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(routines.user_id, user.id) })
+            }
+            if (table === 'task_completions') {
+              await tx.insert(taskCompletions).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: taskCompletions.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(taskCompletions.user_id, user.id) })
+            }
           }
         }
-      }
-    })
+      })
 
-    app.log.info({ user: user.id, mutations: body.mutations.length }, 'Sync push applied')
-    return reply.send({ success: true })
+      app.log.info({ user: user.id, mutations: body.mutations.length }, 'Sync push applied')
+      return reply.send({ success: true })
+    } catch (error) {
+      app.log.error({ err: error, user: user.id }, 'Sync push transaction failed')
+      return reply.status(500).send({ 
+        success: false, 
+        error: 'Failed to apply sync mutations. Please try again.' 
+      })
+    }
   })
 
   // POST /v1/sync/pull — Mobile pulls server changes
@@ -92,30 +100,39 @@ export const syncRoutes: FastifyPluginAsync = async (app) => {
   app.get('/powersync-token', { preHandler: [app.authenticate] }, async (req, reply) => {
     const user = req.user!
     
-    // Retrieve from env in production, but hardcode dummy for draft
-    const POWERSYNC_PRIVATE_KEY = process.env.POWERSYNC_PRIVATE_KEY || 'your-powersync-private-key'
+    const POWERSYNC_PRIVATE_KEY = process.env.POWERSYNC_PRIVATE_KEY
     
-    // We import jwt inside the module or at top level. Let's require it here to avoid top-level import issues for the draft.
+    // Allow development mode without PowerSync for testing
+    if (!POWERSYNC_PRIVATE_KEY && process.env.NODE_ENV === 'development') {
+      return reply.status(503).send({ 
+        success: false, 
+        error: 'PowerSync not configured in development' 
+      })
+    }
+    
+    if (!POWERSYNC_PRIVATE_KEY) {
+      return reply.status(500).send({ 
+        success: false, 
+        error: 'PowerSync private key not configured' 
+      })
+    }
+    
     const jwt = require('jsonwebtoken')
     
     try {
       const token = jwt.sign(
-        {
-          user_id: user.id,
-        },
+        { user_id: user.id },
         POWERSYNC_PRIVATE_KEY,
         { algorithm: 'RS256', expiresIn: '5m' }
       )
       
       return reply.send({ token })
-    } catch (e) {
-      // RS256 requires a valid PEM key. If dummy key fails, fallback to HS256 for local dev or throw.
-      const token = jwt.sign(
-        { user_id: user.id },
-        POWERSYNC_PRIVATE_KEY,
-        { algorithm: 'HS256', expiresIn: '5m' }
-      )
-      return reply.send({ token, warning: 'Used HS256 fallback due to invalid RSA key' })
+    } catch (e: any) {
+      app.log.error({ err: e }, 'Failed to sign PowerSync token')
+      return reply.status(500).send({ 
+        success: false, 
+        error: 'Failed to generate PowerSync token. Check RSA key configuration.' 
+      })
     }
   })
 }

@@ -4,7 +4,7 @@ import { TimeBlocksService, CreateTimeBlockSchema, UpdateTimeBlockSchema } from 
 
 export const timeblocksRoutes: FastifyPluginAsync = async (app) => {
   // CREATE TIME BLOCK
-  app.post('/', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
 
     const parsed = CreateTimeBlockSchema.safeParse(req.body)
@@ -58,7 +58,7 @@ export const timeblocksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // UPDATE TIME BLOCK
-  app.put('/:id', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.put('/:id', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 
@@ -77,7 +77,7 @@ export const timeblocksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // DELETE TIME BLOCK
-  app.delete('/:id', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.delete('/:id', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 
@@ -91,7 +91,7 @@ export const timeblocksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // CONVERT TIME BLOCK TO TASK
-  app.post('/:id/convert-to-task', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/:id/convert-to-task', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 

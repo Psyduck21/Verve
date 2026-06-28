@@ -1,5 +1,6 @@
-import { db, taskTemplates, templateSubtasks, tasks } from '@verve/db'
-import { eq, desc, and } from '@verve/db'
+import { db } from '../../lib/db'
+import { taskTemplates, templateSubtasks, tasks } from '@verve/db'
+import { eq, desc, and, sql } from '@verve/db'
 import { z } from 'zod'
 
 export const CreateTemplateSchema = z.object({
@@ -9,6 +10,7 @@ export const CreateTemplateSchema = z.object({
   default_category: z.string().optional(),
   default_duration_minutes: z.number().min(5).max(480).optional(),
   is_public: z.boolean().optional(),
+  is_default: z.boolean().optional(),
   subtasks: z.array(z.object({
     title: z.string().min(1).max(200),
     default_duration_minutes: z.number().min(5).max(480).optional(),
@@ -22,6 +24,7 @@ export const UpdateTemplateSchema = z.object({
   default_category: z.string().optional(),
   default_duration_minutes: z.number().min(5).max(480).optional(),
   is_public: z.boolean().optional(),
+  is_default: z.boolean().optional(),
   subtasks: z.array(z.object({
     title: z.string().min(1).max(200),
     default_duration_minutes: z.number().min(5).max(480).optional(),
@@ -37,6 +40,13 @@ export class TemplatesService {
    */
   static async createTemplate(userId: string, input: CreateTemplateInput) {
     return db.transaction(async (tx) => {
+      // If this is set as default, unset others
+      if (input.is_default) {
+        await tx.update(taskTemplates)
+          .set({ is_default: false })
+          .where(eq(taskTemplates.user_id, userId))
+      }
+
       // Create the template
       const [template] = await tx
         .insert(taskTemplates)
@@ -48,6 +58,7 @@ export class TemplatesService {
           default_category: input.default_category,
           default_duration_minutes: input.default_duration_minutes || 30,
           is_public: input.is_public || false,
+          is_default: input.is_default || false,
           usage_count: 0,
         })
         .returning()
@@ -71,18 +82,22 @@ export class TemplatesService {
   /**
    * List templates for a user
    */
-  static async listTemplates(userId: string, options: { include_public?: boolean } = {}) {
+  static async listTemplates(userId: string, options: { include_public?: boolean, limit?: number, offset?: number } = {}) {
     const conditions = [eq(taskTemplates.user_id, userId)]
 
     if (options.include_public) {
       conditions.push(eq(taskTemplates.is_public, true))
     }
 
+    const { limit = 50, offset = 0 } = options
+
     const templates = await db
       .select()
       .from(taskTemplates)
       .where(and(...conditions))
       .orderBy(desc(taskTemplates.usage_count), desc(taskTemplates.created_at))
+      .limit(limit)
+      .offset(offset)
 
     return templates
   }
@@ -122,6 +137,13 @@ export class TemplatesService {
     return db.transaction(async (tx) => {
       const existing = await this.getTemplate(id, userId)
 
+      // If this is set as default, unset others
+      if (input.is_default) {
+        await tx.update(taskTemplates)
+          .set({ is_default: false })
+          .where(and(eq(taskTemplates.user_id, userId), sql`${taskTemplates.id} != ${id}`))
+      }
+
       // Update template
       const [updated] = await tx
         .update(taskTemplates)
@@ -132,6 +154,7 @@ export class TemplatesService {
           default_category: input.default_category ?? existing.default_category,
           default_duration_minutes: input.default_duration_minutes ?? existing.default_duration_minutes,
           is_public: input.is_public ?? existing.is_public,
+          is_default: input.is_default ?? existing.is_default,
           updated_at: new Date(),
         })
         .where(eq(taskTemplates.id, id))
@@ -185,12 +208,12 @@ export class TemplatesService {
       .insert(tasks)
       .values({
         user_id: userId,
-        routine_id: null,
+        routine_id: undefined,
         title: template.name,
         description: template.description || `Created from template: ${template.name}`,
         priority: template.default_priority,
         status: 'not_started',
-        category: template.default_category,
+        category: template.default_category || undefined,
         scheduled_at: scheduledAt,
         estimated_duration_minutes: template.default_duration_minutes,
       })
@@ -201,12 +224,13 @@ export class TemplatesService {
       for (const subtask of template.subtasks) {
         await db.insert(tasks).values({
           user_id: userId,
-          routine_id: null,
+          routine_id: undefined,
+          parent_task_id: mainTask.id,
           title: subtask.title,
           description: `Subtask of: ${template.name}`,
           priority: template.default_priority,
           status: 'not_started',
-          category: template.default_category,
+          category: template.default_category || undefined,
           scheduled_at: scheduledAt,
           estimated_duration_minutes: subtask.default_duration_minutes,
         })
@@ -224,9 +248,9 @@ export class TemplatesService {
 
     return this.createTemplate(userId, {
       name: `${template.name} (Copy)`,
-      description: template.description,
+      description: template.description || undefined,
       default_priority: template.default_priority,
-      default_category: template.default_category,
+      default_category: template.default_category || undefined,
       default_duration_minutes: template.default_duration_minutes,
       is_public: false, // Duplicates are never public
       subtasks: template.subtasks.map(st => ({

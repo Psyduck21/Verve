@@ -12,18 +12,21 @@ export async function syncGoogleCalendar(userId: string, oauthClient: any) {
     )
   })
 
-  let syncRoutine = await db.query.routines.findFirst({
+  let syncRoutineId = (await db.query.routines.findFirst({
     where: (r, { eq, and }) => and(eq(r.user_id, userId), eq(r.title, 'Calendar Sync')),
-  })
-  if (!syncRoutine) {
-    const [newRoutine] = await db.insert(routines).values({
-      user_id: userId,
-      title: 'Calendar Sync',
-      goal: 'Imported events from external calendars',
-      is_active: true,
-      sort_order: -2,
-    }).returning()
-    syncRoutine = newRoutine
+  }))?.id
+  if (!syncRoutineId) {
+    const [newRoutine] = await db
+      .insert(routines)
+      .values({
+        user_id: userId,
+        title: 'Calendar Sync',
+        goal: 'Imported events from external calendars',
+        is_active: true,
+        sort_order: -2,
+      })
+      .returning({ id: routines.id })
+    syncRoutineId = newRoutine.id
   }
 
   const calendar = google.calendar({ version: 'v3', auth: oauthClient })
@@ -88,7 +91,7 @@ export async function syncGoogleCalendar(userId: string, oauthClient: any) {
           })
         } else {
           await TasksService.createTask(userId, {
-            routine_id: syncRoutine.id,
+            routine_id: syncRoutineId,
             title: event.summary || 'Busy',
             priority: 'medium',
             status: 'not_started',

@@ -11,6 +11,7 @@ interface Template {
   default_category?: string
   default_duration_minutes: number
   is_public: boolean
+  is_default: boolean
   usage_count: number
   subtasks?: Array<{
     id: string
@@ -26,6 +27,7 @@ interface TemplateCardProps {
   onDelete: () => void
   onDuplicate: () => void
   onApply: () => void
+  onSetDefault: () => void
 }
 
 const PRIORITY_COLORS = {
@@ -35,7 +37,7 @@ const PRIORITY_COLORS = {
   low: 'bg-green-500',
 }
 
-export function TemplateCard({ template, onEdit, onDelete, onDuplicate, onApply }: TemplateCardProps) {
+export function TemplateCard({ template, onEdit, onDelete, onDuplicate, onApply, onSetDefault }: TemplateCardProps) {
   return (
     <motion.div
       whileHover={{ y: -2 }}
@@ -48,7 +50,14 @@ export function TemplateCard({ template, onEdit, onDelete, onDuplicate, onApply 
             <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>
           )}
         </div>
-        <div className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[template.default_priority]}`} />
+        <div className="flex items-center gap-2">
+          {template.is_default && (
+            <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+              Default
+            </span>
+          )}
+          <div className={`w-2 h-2 rounded-full ${PRIORITY_COLORS[template.default_priority]}`} />
+        </div>
       </div>
 
       <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
@@ -91,6 +100,14 @@ export function TemplateCard({ template, onEdit, onDelete, onDuplicate, onApply 
           <Play size={14} />
           Apply
         </button>
+        {!template.is_default && (
+          <button
+            onClick={onSetDefault}
+            className="flex-1 px-2 py-1.5 bg-muted text-foreground hover:bg-muted/80 rounded-lg text-[10px] font-bold uppercase transition-colors"
+          >
+            Set Default
+          </button>
+        )}
         <button
           onClick={onDuplicate}
           className="p-1.5 hover:bg-muted rounded-lg transition-colors"

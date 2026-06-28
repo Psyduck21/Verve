@@ -38,17 +38,17 @@ export function TasksOverviewMetrics({ tasks }: TasksOverviewMetricsProps) {
                 <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
                         <span className="text-2xl font-black text-foreground tracking-tight leading-none">{stats.high}</span>
-                        <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-md">High</span>
+                        <span className="text-xs font-semibold text-destructive bg-destructive/10 px-2 py-0.5 rounded-md">High</span>
                     </div>
                     <div className="w-px h-8 bg-border" />
                     <div className="flex items-center gap-2">
                         <span className="text-2xl font-black text-foreground tracking-tight leading-none">{stats.medium}</span>
-                        <span className="text-xs font-semibold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-md">Medium</span>
+                        <span className="text-xs font-semibold text-[hsl(var(--status-review))] bg-[hsl(var(--status-review)/0.1)] px-2 py-0.5 rounded-md">Medium</span>
                     </div>
                     <div className="w-px h-8 bg-border" />
                     <div className="flex items-center gap-2">
                         <span className="text-2xl font-black text-foreground tracking-tight leading-none">{stats.low}</span>
-                        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Low</span>
+                        <span className="text-xs font-semibold text-[hsl(var(--status-progress))] bg-[hsl(var(--status-progress)/0.1)] px-2 py-0.5 rounded-md">Low</span>
                     </div>
                 </div>
             </div>
@@ -64,7 +64,7 @@ export function TasksOverviewMetrics({ tasks }: TasksOverviewMetricsProps) {
                     <div className="w-px h-8 bg-border" />
                     <div className="flex items-center gap-2">
                         <span className="text-2xl font-black text-foreground tracking-tight leading-none">{stats.done}</span>
-                        <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">Done</span>
+                        <span className="text-xs font-semibold text-[hsl(var(--status-done))] bg-[hsl(var(--status-done)/0.1)] px-2 py-0.5 rounded-md">Done</span>
                     </div>
                     <div className="w-px h-8 bg-border" />
                     <div className="flex items-center gap-2">

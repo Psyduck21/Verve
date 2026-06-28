@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useOnboarding } from "@/contexts/onboarding-context"
-import { Calendar, CheckCircle2, XCircle, Loader2, ArrowRight } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { Calendar, CheckCircle2, Loader2, ArrowRight } from "lucide-react"
+import { motion } from "framer-motion"
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
 const INTEGRATIONS = [
   {
@@ -17,7 +19,7 @@ const INTEGRATIONS = [
 ]
 
 export function StepIntegrations() {
-  const { collectedData, updateData } = useOnboarding()
+  const { updateData, skipStep } = useOnboarding()
   const [connectedIntegrations, setConnectedIntegrations] = useState<string[]>([])
   const [isConnecting, setIsConnecting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -48,8 +50,7 @@ export function StepIntegrations() {
     try {
       // For Google Calendar, redirect to OAuth flow
       if (integrationId === 'google_calendar') {
-        // Redirect directly to the OAuth endpoint with redirect_to parameter
-        window.location.href = '/api/v1/integrations/google/auth?redirect_to=onboarding'
+        window.location.href = `${API_BASE_URL}/v1/integrations/google/auth?redirect_to=onboarding`
       }
     } catch (err) {
       setError('Failed to connect integration. Please try again.')
@@ -59,6 +60,7 @@ export function StepIntegrations() {
 
   const handleSkip = () => {
     updateData({ skipped_integrations: INTEGRATIONS.map(i => i.id) })
+    skipStep(4)
   }
 
   const isConnected = (id: string) => connectedIntegrations.includes(id)

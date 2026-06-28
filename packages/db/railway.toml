@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pnpm --filter=@verve/db build"
+
+[deploy]
+startCommand = "pnpm --filter=@verve/db db:migrate"
+restartPolicyType = "never"

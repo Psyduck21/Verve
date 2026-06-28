@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Type, AlignLeft, AlertCircle, Tag, Clock, CornerDownLeft, Save, X, ArrowUp, ArrowDown, Calendar } from "lucide-react"
+import { Type, AlignLeft, AlertCircle, Tag, Clock, CornerDownLeft, Save, X, ArrowUp, ArrowDown, Calendar, CheckCircle } from "lucide-react"
 import { format } from "date-fns"
 import { useUpdateTask } from "@/hooks/useTasks"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -21,6 +21,7 @@ interface EditTaskModalProps {
 
 const PRIORITIES = ["critical", "high", "medium", "low"]
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240, 480]
+const STATUS_OPTIONS = ["not_started", "in_progress", "completed", "missed", "cancelled"]
 
 const formatDuration = (mins: number) => {
     if (mins < 60) return `${mins}m`
@@ -51,6 +52,7 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
         enabled: open && !!task?.id,
     })
     const subtasks = subtasksData || []
+    const genTempId = () => `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`
     
     const displayCategories = categories.length > 0 ? categories : [
         {name: 'work', color: '#ef4444'},
@@ -83,6 +85,7 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
         { id: 'category', label: 'Category', icon: Tag, value: editedTask?.category || 'personal' },
         { id: 'scheduled_at', label: 'Start Time', icon: Calendar, value: editedTask?.scheduled_at ? format(new Date(editedTask.scheduled_at), "MMM d, yyyy h:mm a") : 'Not scheduled' },
         { id: 'duration', label: 'Duration', icon: Clock, value: formatDuration(editedTask?.estimated_duration_minutes || 30) },
+        { id: 'status', label: 'Status', icon: CheckCircle, value: editedTask?.status || 'not_started' },
     ]
 
     const currentField = fields[focusedFieldIdx]
@@ -91,6 +94,7 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
     if (currentField?.id === 'priority') currentOptions = PRIORITIES
     else if (currentField?.id === 'category') currentOptions = displayCategories.map((c: any) => c.name)
     else if (currentField?.id === 'duration') currentOptions = DURATIONS.map(d => d.toString())
+    else if (currentField?.id === 'status') currentOptions = STATUS_OPTIONS
 
     const filteredOptions = currentOptions.filter(o => o.toLowerCase().includes(editValue.toLowerCase()))
     const safeDropdownFocusIdx = Math.min(dropdownFocusIdx, Math.max(0, filteredOptions.length - 1))
@@ -109,6 +113,17 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (
+            isHotkey(e, KEYBINDINGS.MODALS.SAVE) ||
+            isHotkey(e, KEYBINDINGS.MODALS.NAV_DOWN) ||
+            isHotkey(e, KEYBINDINGS.MODALS.NAV_UP) ||
+            isHotkey(e, KEYBINDINGS.MODALS.SELECT_OPTION) ||
+            isHotkey(e, KEYBINDINGS.MODALS.SELECT_AND_SAVE_OPTION) ||
+            isHotkey(e, KEYBINDINGS.MODALS.CLOSE)
+        ) {
+            e.stopPropagation()
+        }
+
         if (isHotkey(e, KEYBINDINGS.MODALS.SAVE)) {
             e.preventDefault()
             if (isEditing) {
@@ -135,6 +150,8 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
                     const tzOffset = dateObj.getTimezoneOffset() * 60000
                     const localISOTime = (new Date(dateObj.getTime() - tzOffset)).toISOString().slice(0, 16)
                     setEditValue(localISOTime)
+                } else if (field.id === 'status') {
+                    setEditValue(editedTask?.status || 'not_started')
                 } else {
                     setEditValue(field.id === 'duration' ? (editedTask?.estimated_duration_minutes || 30).toString() : (editedTask?.[field.id] || ''))
                 }
@@ -189,7 +206,8 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
             scheduled_at: editedTask.scheduled_at,
             priority: editedTask.priority,
             category: editedTask.category,
-            estimated_duration_minutes: editedTask.estimated_duration_minutes
+            estimated_duration_minutes: editedTask.estimated_duration_minutes,
+            status: editedTask.status,
         }, {
             onSuccess: handleClose
         })
@@ -348,30 +366,61 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
                                 taskId={editedTask.id}
                                 subtasks={subtasks}
                                 onAddSubtask={async (title) => {
+                                    const queryKey = ['subtasks', editedTask.id]
+                                    const previous: any[] = queryClient.getQueryData(queryKey) || []
+                                    const tempId = genTempId()
+                                    const tempSub = { id: tempId, title, status: 'not_started', priority: 'medium', estimated_duration_minutes: 15, order_index: previous.length }
+
+                                    // optimistic add
+                                    queryClient.setQueryData(queryKey, (old: any[] | undefined) => {
+                                        const arr = old ? [...old] : []
+                                        return [...arr, tempSub]
+                                    })
+
                                     try {
-                                        await apiClient.subtasks.create(editedTask.id, { title })
-                                        refetchSubtasks()
+                                        const res = await apiClient.subtasks.create(editedTask.id, { title })
+                                        const created = res?.data
+                                        if (created) {
+                                            // replace temp with real
+                                            queryClient.setQueryData(queryKey, (old: any[] | undefined) => (old || []).map(s => s.id === tempId ? created : s))
+                                        } else {
+                                            await refetchSubtasks()
+                                        }
                                     } catch (e) {
                                         console.error('Failed to create subtask', e)
+                                        // rollback
+                                        queryClient.setQueryData(queryKey, previous)
                                     }
                                 }}
                                 onToggleSubtask={async (subtaskId) => {
-                                    const subtask = subtasks.find((s: any) => s.id === subtaskId)
+                                    const queryKey = ['subtasks', editedTask.id]
+                                    const previous: any[] = queryClient.getQueryData(queryKey) || []
+                                    const subtask = (previous || []).find(s => s.id === subtaskId)
                                     if (!subtask) return
                                     const newStatus = subtask.status === 'completed' ? 'not_started' : 'completed'
+
+                                    // optimistic toggle
+                                    queryClient.setQueryData(queryKey, (old: any[] | undefined) => (old || []).map(s => s.id === subtaskId ? { ...s, status: newStatus } : s))
+
                                     try {
                                         await apiClient.subtasks.update(editedTask.id, subtaskId, { status: newStatus })
-                                        refetchSubtasks()
                                     } catch (e) {
                                         console.error('Failed to toggle subtask', e)
+                                        queryClient.setQueryData(queryKey, previous)
                                     }
                                 }}
                                 onDeleteSubtask={async (subtaskId) => {
+                                    const queryKey = ['subtasks', editedTask.id]
+                                    const previous: any[] = queryClient.getQueryData(queryKey) || []
+
+                                    // optimistic remove
+                                    queryClient.setQueryData(queryKey, (old: any[] | undefined) => (old || []).filter(s => s.id !== subtaskId))
+
                                     try {
                                         await apiClient.subtasks.delete(editedTask.id, subtaskId)
-                                        refetchSubtasks()
                                     } catch (e) {
                                         console.error('Failed to delete subtask', e)
+                                        queryClient.setQueryData(queryKey, previous)
                                     }
                                 }}
                                 onReorder={async (subtaskIds) => {

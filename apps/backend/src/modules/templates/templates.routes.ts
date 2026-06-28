@@ -4,7 +4,7 @@ import { TemplatesService, CreateTemplateSchema, UpdateTemplateSchema } from './
 
 export const templatesRoutes: FastifyPluginAsync = async (app) => {
   // CREATE TEMPLATE
-  app.post('/', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
 
     const parsed = CreateTemplateSchema.safeParse(req.body)
@@ -24,11 +24,16 @@ export const templatesRoutes: FastifyPluginAsync = async (app) => {
   // LIST TEMPLATES
   app.get('/', { preHandler: [app.authenticate] }, async (req, reply) => {
     const user = req.user!
-    const { include_public } = req.query as { include_public?: string }
+    const { include_public, page = 1, limit = 50 } = req.query as { include_public?: string, page?: string, limit?: string }
+    const pageNum = Math.max(1, parseInt(String(page)) || 1)
+    const limitNum = Math.max(1, Math.min(100, parseInt(String(limit)) || 50))
+    const offsetNum = (pageNum - 1) * limitNum
 
     try {
       const templates = await TemplatesService.listTemplates(user.id, {
         include_public: include_public === 'true',
+        limit: limitNum,
+        offset: offsetNum,
       })
       return reply.send({ success: true, data: templates })
     } catch (error) {
@@ -52,7 +57,7 @@ export const templatesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // UPDATE TEMPLATE
-  app.put('/:id', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.put('/:id', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 
@@ -71,7 +76,7 @@ export const templatesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // DELETE TEMPLATE
-  app.delete('/:id', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.delete('/:id', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 
@@ -85,7 +90,7 @@ export const templatesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // APPLY TEMPLATE
-  app.post('/:id/apply', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/:id/apply', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
     const { scheduled_at } = req.body as { scheduled_at?: string }
@@ -100,7 +105,7 @@ export const templatesRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // DUPLICATE TEMPLATE
-  app.post('/:id/duplicate', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/:id/duplicate', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 

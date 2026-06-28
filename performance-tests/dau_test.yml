@@ -1,0 +1,57 @@
+config:
+  target: "http://127.0.0.1:3001"
+  phases:
+    - duration: 300 # 5 minutes
+      arrivalRate: 2
+      rampTo: 20
+      name: "Morning ramp up (5m)"
+    - duration: 600 # 10 minutes
+      arrivalRate: 20
+      name: "Mid-day peak DAU (10m)"
+    - duration: 300 # 5 minutes
+      arrivalRate: 20
+      rampTo: 2
+      name: "Evening ramp down (5m)"
+  environments:
+    local:
+      target: "http://127.0.0.1:3001"
+    staging:
+      target: "https://staging-api.yourdomain.com"
+    production:
+      target: "https://api.yourdomain.com"
+scenarios:
+  - name: "Dashboard fetch flow"
+    weight: 5
+    flow:
+      - get:
+          url: "/v1/dashboard/summary"
+          headers:
+            authorization: "Bearer {{ $processEnvironment.TOKEN }}"
+      - get:
+          url: "/v1/categories"
+          headers:
+            authorization: "Bearer {{ $processEnvironment.TOKEN }}"
+  - name: "Tasks list flow"
+    weight: 3
+    flow:
+      - get:
+          url: "/v1/tasks?limit=50&page=1"
+          headers:
+            authorization: "Bearer {{ $processEnvironment.TOKEN }}"
+  - name: "Create task flow"
+    weight: 1
+    flow:
+      - post:
+          url: "/v1/tasks"
+          headers:
+            authorization: "Bearer {{ $processEnvironment.TOKEN }}"
+            content-type: "application/json"
+          json:
+            title: "DAU Test Task {{ $randomString() }}"
+            priority: "medium"
+            estimated_duration_minutes: 30
+  - name: "Public health check"
+    weight: 1
+    flow:
+      - get:
+          url: "/health/detailed"

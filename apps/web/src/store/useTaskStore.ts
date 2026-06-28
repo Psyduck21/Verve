@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type ModalMode = 'task' | 'command'
+type ModalMode = 'task' | 'ai' | 'command'
 
 interface TaskState {
     searchQuery: string

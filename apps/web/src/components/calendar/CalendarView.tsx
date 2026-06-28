@@ -8,12 +8,11 @@ import { ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, ArrowUpRigh
 import { Icon } from "@/components/ui/Icon"
 import { useEvents } from "@/hooks/useEvents"
 import { useUpdateTask, useTasks } from "@/hooks/useTasks"
+import { TimeblocksPanel } from "@/components/timeblocks/TimeblocksPanel"
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop"
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css"
 import { UnscheduledTasksPanel, draggedTaskPayload } from "./UnscheduledTasksPanel"
 import { EditTaskModal } from "@/components/tasks/EditTaskModal"
-import { TimeBlockView } from "@/components/timeblocks/TimeBlockView"
-import { TimeBlockModal, TimeBlockData } from "@/components/timeblocks/TimeBlockModal"
 import { KEYBINDINGS } from "@/config/keybindings"
 import { isHotkey } from "@/utils/keyboard"
 import { cn } from "@/lib/utils"
@@ -80,41 +79,38 @@ function EventBlock({ event, isFocused }: { event: any, isFocused?: boolean }) {
 }
 
 
-export default function CalendarView() {
+interface CalendarViewProps {
+    selectedDate?: Date
+    onSelectedDateChange?: (date: Date) => void
+}
+
+export default function CalendarView({ selectedDate, onSelectedDateChange }: CalendarViewProps) {
     const [view, setView] = useState<any>(Views.WEEK)
     const [date, setDate] = useState(new Date())
     const [currentTime, setCurrentTime] = useState(new Date())
     const [isPanelOpen, setIsPanelOpen] = useState(true)
+    const [activeTab, setActiveTab] = useState<'tasks' | 'timeblocks'>('tasks')
     const [selectedTask, setSelectedTask] = useState<any>(null)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [focusedEventId, setFocusedEventId] = useState<string | null>(null)
-    const [isTimeBlockModalOpen, setIsTimeBlockModalOpen] = useState(false)
-    const [timeBlocks, setTimeBlocks] = useState<any[]>([])
-    const { events } = useEvents()
-    const { data: tasks = [] } = useTasks()
+
+    const calendarRange = useMemo(() => {
+        return {
+            start: startOfWeek(date),
+            end: endOfWeek(date),
+        }
+    }, [date])
+
+    const { events } = useEvents({
+        start_date: calendarRange.start.toISOString(),
+        end_date: calendarRange.end.toISOString(),
+    })
+    const { data: tasks = [] } = useTasks({
+        start_date: calendarRange.start.toISOString(),
+        end_date: calendarRange.end.toISOString(),
+    })
     const { mutate: updateTask } = useUpdateTask()
 
-    // Load time blocks for today
-    const loadTimeBlocks = async () => {
-        try {
-            const today = format(new Date(), 'yyyy-MM-dd')
-            const res = await apiClient.timeblocks.getByDate(today)
-            setTimeBlocks(res.data || [])
-        } catch (e) {
-            console.error('Failed to load time blocks:', e)
-        }
-    }
-
-    useEffect(() => {
-        loadTimeBlocks()
-    }, [])
-
-    // Listen for global 't b' shortcut event
-    useEffect(() => {
-        const handler = () => setIsTimeBlockModalOpen(true)
-        window.addEventListener('open_timeblock_modal', handler)
-        return () => window.removeEventListener('open_timeblock_modal', handler)
-    }, [])
 
     // Dynamically calculate stats based on current view range
     const stats = useMemo(() => {
@@ -137,7 +133,7 @@ export default function CalendarView() {
 
         const totalScheduled = tasksInView.length;
         const completed = tasksInView.filter(t => t.status === "completed").length;
-        const missed = tasksInView.filter(t => t.status === "missed" || (t.status !== "completed" && new Date(t.scheduled_at) < new Date())).length;
+        const missed = tasksInView.filter(t => t.status === "missed" || (t.status !== "completed" && t.scheduled_at && new Date(t.scheduled_at) < new Date())).length;
 
         const completionRate = totalScheduled > 0 ? Math.round((completed / totalScheduled) * 100) : 0;
         const missedRate = totalScheduled > 0 ? Math.round((missed / totalScheduled) * 100) : 0;
@@ -165,11 +161,18 @@ export default function CalendarView() {
     }, [])
 
     useEffect(() => {
+        if (onSelectedDateChange) {
+            onSelectedDateChange(date)
+        }
+    }, [date, onSelectedDateChange])
+
+    useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement
             if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
             if (isEditModalOpen) return // Let modal handle its own keys
 
+            const key = e.key.toLowerCase()
             let startRange, endRange;
             if (view === Views.DAY) {
                 startRange = startOfDay(date);
@@ -207,6 +210,20 @@ export default function CalendarView() {
                     setSelectedTask(focusedEvent.task)
                     setIsEditModalOpen(true)
                 }
+            } else if (isHotkey(e, KEYBINDINGS.CALENDAR.UNSCHEDULE) && focusedEventId) {
+                e.preventDefault()
+                const focusedEvent = visibleEvents.find(ev => ev.task?.id === focusedEventId)
+                if (focusedEvent && focusedEvent.task) {
+                    updateTask({ id: focusedEvent.task.id, scheduled_at: null })
+                }
+            }
+
+            if (activeTab === 'tasks' && isHotkey(e, ['n'])) {
+                e.preventDefault()
+                setIsPanelOpen(true)
+                setActiveTab('timeblocks')
+                window.dispatchEvent(new CustomEvent('create_timeblock_directly'))
+                return
             }
 
             if (isHotkey(e, KEYBINDINGS.CALENDAR.TOGGLE_PANEL)) {
@@ -228,7 +245,17 @@ export default function CalendarView() {
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [view, date, events, focusedEventId, isEditModalOpen])
+    }, [view, date, events, focusedEventId, isEditModalOpen, activeTab])
+
+    // Listen for timeblock modal event and open panel + switch tab
+    useEffect(() => {
+        const handleOpenTimeblockModal = () => {
+            setIsPanelOpen(true)
+            setActiveTab('timeblocks')
+        }
+        window.addEventListener('open_timeblock_modal', handleOpenTimeblockModal)
+        return () => window.removeEventListener('open_timeblock_modal', handleOpenTimeblockModal)
+    }, [])
 
     const CustomWeekHeader = useMemo(() => {
         return ({ date, label }: any) => {
@@ -347,7 +374,13 @@ export default function CalendarView() {
 
     // Required by react-big-calendar to accept external drops
     const dragFromOutsideItem = () => {
-        return draggedTaskPayload || {}
+        if (!draggedTaskPayload) return {}
+        
+        return {
+            id: draggedTaskPayload.id,
+            title: draggedTaskPayload.title,
+            task: draggedTaskPayload
+        }
     }
 
     const handleSelectEvent = (event: any) => {
@@ -356,6 +389,8 @@ export default function CalendarView() {
             setIsEditModalOpen(true)
         }
     }
+
+    const timeblockDate = selectedDate || date
 
     return (
         <div className="flex flex-col h-full w-full animate-fade-in-up gap-2">
@@ -428,22 +463,22 @@ export default function CalendarView() {
                 <div className="bg-card border border-border rounded-xl p-3 flex flex-col justify-between shadow-sm">
                     <div className="flex justify-between items-start">
                         <span className="text-xs font-bold text-muted-foreground">Missed / Overdue</span>
-                        <span className="text-[10px] font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded flex items-center gap-0.5"><ArrowDownRight size={10} /> {stats.missedRate}%</span>
+                        <span className="text-[10px] font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded flex items-center gap-0.5"><ArrowDownRight size={10} /> {stats.missedRate}%</span>
                     </div>
                     <span className="text-2xl font-black mt-2">{stats.missed}</span>
                 </div>
             </div>
 
 
-            {/* Calendar & Waitlist Row */}
-            <div className="flex-1 flex min-h-0 relative">
+            {/* Calendar & Sidebar Row */}
+            <div className="flex-1 flex min-h-0 relative gap-4">
                 <div className="flex-1 bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col h-full min-w-0 relative">
 
                     {/* Toggle Button for Sidebar */}
                     <button
                         onClick={() => setIsPanelOpen(!isPanelOpen)}
                         className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 bg-card border border-border shadow-md rounded-full p-1.5 text-muted-foreground hover:text-foreground transition-all"
-                        title="Toggle Unscheduled Tasks (Alt+W)"
+                        title="Toggle side panel"
                     >
                         {isPanelOpen ? <Icon icon={PanelRightClose} size="sm" /> : <Icon icon={PanelRightOpen} size="sm" />}
                     </button>
@@ -451,8 +486,8 @@ export default function CalendarView() {
                     <DnDCalendar
                         localizer={localizer}
                         events={events}
-                        startAccessor={(event: any) => new Date(event.start)}
-                        endAccessor={(event: any) => new Date(event.end)}
+                        startAccessor={(e: any) => new Date(e.start)}
+                        endAccessor={(e: any) => new Date(e.end)}
                         getNow={() => currentTime}
                         scrollToTime={new Date(currentTime.getTime() - 4 * 60 * 60 * 1000)}
                         min={minTime}
@@ -484,7 +519,46 @@ export default function CalendarView() {
                     />
                 </div>
 
-                <UnscheduledTasksPanel isOpen={isPanelOpen} onTaskClick={handleSelectEvent} />
+                <div className={cn(
+                    "flex flex-col h-full transition-all duration-300 ease-in-out",
+                    isPanelOpen ? "w-80 opacity-100" : "w-0 opacity-0 overflow-hidden"
+                )}>
+                    <div className="h-full bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+                        <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('tasks')}
+                                className={cn(
+                                    "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                                    activeTab === 'tasks'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-background text-muted-foreground hover:bg-muted/80'
+                                )}
+                            >
+                                Tasks
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('timeblocks')}
+                                className={cn(
+                                    "rounded-full px-3 py-1 text-xs font-semibold transition-colors",
+                                    activeTab === 'timeblocks'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-background text-muted-foreground hover:bg-muted/80'
+                                )}
+                            >
+                                Timeblocks
+                            </button>
+                        </div>
+                        <div className="h-full overflow-hidden">
+                            {activeTab === 'tasks' ? (
+                                <UnscheduledTasksPanel isOpen={true} onTaskClick={handleSelectEvent} className="h-full" />
+                            ) : (
+                                <TimeblocksPanel selectedDate={timeblockDate} className="h-full" />
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <EditTaskModal 
@@ -496,19 +570,6 @@ export default function CalendarView() {
                 task={selectedTask} 
             />
 
-            {/* Time Block Modal (triggered by 't b' shortcut or Add Block button) */}
-            <TimeBlockModal
-                isOpen={isTimeBlockModalOpen}
-                onClose={() => setIsTimeBlockModalOpen(false)}
-                onSave={async (data: TimeBlockData) => {
-                    try {
-                        await apiClient.timeblocks.create(data)
-                        loadTimeBlocks()
-                    } catch (e) {
-                        console.error('Failed to create time block:', e)
-                    }
-                }}
-            />
         </div>
     )
 }

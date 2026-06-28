@@ -23,9 +23,10 @@ export const userPlanEnum       = pgEnum('user_plan',       ['free', 'pro', 'ent
 export const taskStatusEnum     = pgEnum('task_status',     ['not_started', 'in_progress', 'completed', 'missed', 'cancelled'])
 export const taskPriorityEnum   = pgEnum('task_priority',   ['critical', 'high', 'medium', 'low'])
 export const syncOperationEnum  = pgEnum('sync_operation',  ['INSERT', 'UPDATE', 'DELETE'])
-export const aiRequestTypeEnum  = pgEnum('ai_request_type', ['generate_routine', 'extract_questions', 'reschedule', 'extract_email', 'parse_task'])
+export const aiRequestTypeEnum  = pgEnum('ai_request_type', ['generate_routine', 'extract_questions', 'reschedule', 'extract_email', 'parse_task', 'assistant_plan', 'assistant_execute'])
 export const oauthProviderEnum  = pgEnum('oauth_provider',  ['google', 'github', 'apple', 'microsoft'])
 export const externalProviderEnum = pgEnum('external_provider', ['google_calendar', 'gmail', 'chrome_extension', 'slack', 'outlook', 'zoom'])
+export const userRoleEnum       = pgEnum('user_role',       ['viewer', 'admin', 'superadmin'])
 
 // ── users ─────────────────────────────────────────────────────
 export const users = pgTable('users', {
@@ -58,6 +59,7 @@ export const users = pgTable('users', {
   last_active_at:              timestamp('last_active_at', { withTimezone: true }),
   last_synced_at:              timestamp('last_synced_at', { withTimezone: true }),
   preferences:                 jsonb('preferences').notNull().default({}),
+  role:                        userRoleEnum('role').notNull().default('viewer'),
   created_at:                  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at:                  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deleted_at:                  timestamp('deleted_at', { withTimezone: true }),
@@ -124,6 +126,7 @@ export const routines = pgTable('routines', {
   color:              text('color').notNull().default('#3b82f6'),
   icon:               text('icon'),
   is_active:          boolean('is_active').notNull().default(true),
+  is_default:         boolean('is_default').notNull().default(false),
   sort_order:         integer('sort_order').notNull().default(0),
   ai_generated_at:    timestamp('ai_generated_at', { withTimezone: true }),
   ai_model_used:      text('ai_model_used'),
@@ -154,7 +157,7 @@ export const categories = pgTable('categories', {
 // ── tasks ─────────────────────────────────────────────────────
 export const tasks = pgTable('tasks', {
   id:                           uuid('id').primaryKey().defaultRandom(),
-  routine_id:                   uuid('routine_id').notNull().references(() => routines.id, { onDelete: 'cascade' }),
+  routine_id:                   uuid('routine_id').references(() => routines.id, { onDelete: 'cascade' }),
   user_id:                      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   parent_task_id:               uuid('parent_task_id'),
   title:                        text('title').notNull(),
@@ -162,7 +165,7 @@ export const tasks = pgTable('tasks', {
   priority:                     taskPriorityEnum('priority').notNull().default('medium'),
   status:                       taskStatusEnum('status').notNull().default('not_started'),
   category:                     text('category'),
-  scheduled_at:                 timestamp('scheduled_at', { withTimezone: true }).notNull(),
+  scheduled_at:                 timestamp('scheduled_at', { withTimezone: true }),
   estimated_duration_minutes:   integer('estimated_duration_minutes').notNull().default(30),
   actual_duration_minutes:      integer('actual_duration_minutes'),
   target_week:                  integer('target_week'),
@@ -185,6 +188,7 @@ export const tasks = pgTable('tasks', {
                   .where(sql`${t.status} = 'not_started' AND ${t.deleted_at} IS NULL`),
   parentTaskIdx: index('idx_tasks_parent_task_id').on(t.parent_task_id),
   orderIdx:     index('idx_tasks_order_index').on(t.parent_task_id, t.order_index),
+  compoundIdx:  index('idx_tasks_user_scheduled_parent').on(t.user_id, t.scheduled_at, t.parent_task_id),
 }))
 
 // Self-reference foreign key constraint for parent_task_id will be added via migration
@@ -402,6 +406,7 @@ export const taskTemplates = pgTable('task_templates', {
   default_category:        text('default_category'),
   default_duration_minutes: integer('default_duration_minutes').notNull().default(30),
   is_public:               boolean('is_public').notNull().default(false),
+  is_default:              boolean('is_default').notNull().default(false),
   usage_count:             integer('usage_count').notNull().default(0),
   created_at:              timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at:              timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

@@ -84,11 +84,6 @@ export default function TasksView() {
                             {view === "list" && (
                                 <TaskListView tasks={filteredTasks} />
                             )}
-                            {view === "timeline" && (
-                                <div className="flex items-center justify-center h-full text-muted-foreground font-bold border border-dashed border-border bg-card shadow-sm rounded-2xl">
-                                    Timeline View coming soon
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>

@@ -4,17 +4,19 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { motion } from "framer-motion"
 import { format } from "date-fns"
-import { Calendar, AlignLeft, GripVertical, CheckCircle2, MoreHorizontal, ListTodo } from "lucide-react"
+import { Calendar, AlignLeft, GripVertical, CheckCircle2, MoreHorizontal, ListTodo, Check } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import type { Task } from "@/hooks/useTasks"
 import { cn } from "@/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "@/utils/apiClient"
+import { useRoutines } from "@/hooks/useRoutines"
 
 interface TaskCardProps {
     task: Task
     isOverlay?: boolean
     isFocused?: boolean
+    isSelected?: boolean
     onClick?: () => void
 }
 
@@ -47,7 +49,10 @@ const CATEGORY_BG_COLORS = {
 }
 
 
-export function TaskCard({ task, isOverlay, isFocused, onClick }: TaskCardProps) {
+export function TaskCard({ task, isOverlay, isFocused, isSelected, onClick }: TaskCardProps) {
+    const { data: routines = [] } = useRoutines()
+    const routine = routines.find(r => r.id === task.routine_id)
+
     const {
         attributes,
         listeners,
@@ -90,11 +95,23 @@ export function TaskCard({ task, isOverlay, isFocused, onClick }: TaskCardProps)
                 "border-y-border border-r-border",
                 isOverlay && "shadow-[0_12px_24px_rgba(0,0,0,0.1)] scale-105 rotate-2 cursor-grabbing z-50",
                 task.status === "completed" && "opacity-50 grayscale",
-                isFocused && "shadow-2xl scale-[1.04] z-50 !border-l-[4.8px]"
+                isFocused && "shadow-2xl scale-[1.04] z-50 !border-l-[4.8px]",
+                isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
             )}
         >
             {/* Drag Handle & Top Row */}
             <div className="flex items-center justify-between gap-2">
+                {/* Focus indicator */}
+                {isFocused && (
+                    <span className="absolute right-4 top-4 h-2.5 w-2.5 rounded-full bg-primary shadow-lg" />
+                )}
+                {/* Selection Checkbox */}
+                {isSelected && (
+                    <div className="p-1 text-primary">
+                        <Icon icon={Check} size="sm" className="w-4 h-4" />
+                    </div>
+                )}
+                
                 <div 
                     {...attributes} 
                     {...listeners} 
@@ -109,6 +126,13 @@ export function TaskCard({ task, isOverlay, isFocused, onClick }: TaskCardProps)
                     <span className={cn("px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md", PRIORITY_COLORS[task.priority])}>
                         {task.priority}
                     </span>
+                    
+                    {/* Routine Badge */}
+                    {routine && (
+                        <span className="px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md bg-primary/10 text-primary border border-primary/20">
+                            {routine.title}
+                        </span>
+                    )}
                     
                     {/* Category Badge */}
                     {task.category && (

@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from 'react'
+import { apiClient } from '@/utils/apiClient'
 
 export interface OnboardingData {
   timezone?: string
@@ -12,7 +13,8 @@ export interface OnboardingData {
   priority_preference?: string
   challenge?: string
   buffer_preference?: string
-  generated_routine?: any[]
+  generated_routines?: any[]
+  accepted_routine?: any
   skipped_integrations?: string[]
   first_task_created?: boolean
   first_task_title?: string
@@ -50,57 +52,68 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     stepDurations: {},
   })
 
-  const nextStep = () => {
-    if (currentStep < 7) {
-      setCurrentStep(currentStep + 1)
+  const nextStep = useCallback(() => {
+    setCurrentStep(prevStepNumber => {
+      if (prevStepNumber >= 7) {
+        return prevStepNumber
+      }
+
       setProgress(prev => ({
         ...prev,
-        completedSteps: [...prev.completedSteps, currentStep],
+        completedSteps: prev.completedSteps.includes(prevStepNumber)
+          ? prev.completedSteps
+          : [...prev.completedSteps, prevStepNumber],
       }))
-    }
-  }
 
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1)
-    }
-  }
+      return prevStepNumber + 1
+    })
+  }, [])
 
-  const goToStep = (step: number) => {
+  const prevStep = useCallback(() => {
+    setCurrentStep(prevStepNumber => (prevStepNumber > 1 ? prevStepNumber - 1 : prevStepNumber))
+  }, [])
+
+  const goToStep = useCallback((step: number) => {
     if (step >= 1 && step <= 7) {
       setCurrentStep(step)
     }
-  }
+  }, [])
 
-  const skipStep = (step: number) => {
+  const skipStep = useCallback((step: number) => {
     setProgress(prev => ({
       ...prev,
-      skippedSteps: [...prev.skippedSteps, step],
+      skippedSteps: prev.skippedSteps.includes(step)
+        ? prev.skippedSteps
+        : [...prev.skippedSteps, step],
     }))
     nextStep()
-  }
+  }, [nextStep])
 
-  const updateData = (data: Partial<OnboardingData>) => {
-    setCollectedData(prev => ({ ...prev, ...data }))
-  }
-
-  const completeOnboarding = async () => {
-    try {
-      const response = await fetch('/api/v1/onboarding/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          completed_at: new Date().toISOString(),
-          total_duration_ms: progress.startedAt 
-            ? Date.now() - progress.startedAt.getTime() 
-            : 0,
-          skipped_steps: progress.skippedSteps,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to complete onboarding')
+  const updateData = useCallback((data: Partial<OnboardingData>) => {
+    setCollectedData(prev => {
+      const hasChanges = Object.entries(data).some(([key, value]) => !Object.is(prev[key as keyof OnboardingData], value))
+      if (!hasChanges) {
+        return prev
       }
+
+      return { ...prev, ...data }
+    })
+  }, [])
+
+  const completeOnboarding = useCallback(async () => {
+    try {
+      await apiClient.onboarding.complete({
+        completed_at: new Date().toISOString(),
+        total_duration_ms: progress.startedAt
+          ? Date.now() - progress.startedAt.getTime()
+          : 0,
+        skipped_steps: progress.skippedSteps,
+        challenge: collectedData.challenge,
+        buffer_preference: collectedData.buffer_preference,
+        skipped_integrations: collectedData.skipped_integrations,
+        first_task_created: collectedData.first_task_created,
+        first_task_title: collectedData.first_task_title,
+      })
 
       setProgress(prev => ({
         ...prev,
@@ -110,9 +123,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       console.error('Error completing onboarding:', error)
       throw error
     }
-  }
+  }, [collectedData, progress.skippedSteps, progress.startedAt])
 
-  const resetOnboarding = () => {
+  const resetOnboarding = useCallback(() => {
     setCurrentStep(1)
     setCollectedData({})
     setProgress({
@@ -120,23 +133,37 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       skippedSteps: [],
       stepDurations: {},
     })
-  }
+  }, [])
+
+  const value = useMemo(
+    () => ({
+      currentStep,
+      collectedData,
+      progress,
+      nextStep,
+      prevStep,
+      goToStep,
+      skipStep,
+      updateData,
+      completeOnboarding,
+      resetOnboarding,
+    }),
+    [
+      currentStep,
+      collectedData,
+      progress,
+      nextStep,
+      prevStep,
+      goToStep,
+      skipStep,
+      updateData,
+      completeOnboarding,
+      resetOnboarding,
+    ]
+  )
 
   return (
-    <OnboardingContext.Provider
-      value={{
-        currentStep,
-        collectedData,
-        progress,
-        nextStep,
-        prevStep,
-        goToStep,
-        skipStep,
-        updateData,
-        completeOnboarding,
-        resetOnboarding,
-      }}
-    >
+    <OnboardingContext.Provider value={value}>
       {children}
     </OnboardingContext.Provider>
   )

@@ -1,14 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { useOnboarding } from "@/contexts/onboarding-context"
-import { Keyboard, Command, Zap, ArrowRight, Check } from "lucide-react"
+import { Keyboard, Command, Zap, Check } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 const SHORTCUTS = [
   { key: "Cmd/Ctrl + K", description: "Open command palette", icon: Command },
-  { key: "Cmd/Ctrl + N", description: "Create new task", icon: Zap },
-  { key: "Cmd/Ctrl + /", description: "Show all shortcuts", icon: Keyboard },
+  { key: "/", description: "Create new task", icon: Zap },
+  { key: "?", description: "Show all shortcuts", icon: Keyboard },
 ]
 
 const AI_COMMANDS = [
@@ -18,7 +17,6 @@ const AI_COMMANDS = [
 ]
 
 export function StepLearn() {
-  const { collectedData, updateData } = useOnboarding()
   const [activeTab, setActiveTab] = useState<"shortcuts" | "ai">("shortcuts")
   const [completedShortcuts, setCompletedShortcuts] = useState<Set<number>>(new Set())
   const [completedAI, setCompletedAI] = useState<Set<number>>(new Set())
@@ -49,12 +47,6 @@ export function StepLearn() {
 
   const totalCompleted = completedShortcuts.size + completedAI.size
   const totalItems = SHORTCUTS.length + AI_COMMANDS.length
-  const isComplete = totalCompleted >= totalItems
-
-  const handleContinue = () => {
-    updateData({ shortcuts_learned: true })
-  }
-
   return (
     <div className="space-y-8">
       <div className="space-y-3">
@@ -218,22 +210,6 @@ export function StepLearn() {
         </div>
       </div>
 
-      {/* Continue Button */}
-      {isComplete && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="pt-4"
-        >
-          <button
-            onClick={handleContinue}
-            className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
-          >
-            Continue to Final Step
-            <ArrowRight size={16} />
-          </button>
-        </motion.div>
-      )}
     </div>
   )
 }

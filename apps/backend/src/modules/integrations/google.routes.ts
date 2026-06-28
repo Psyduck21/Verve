@@ -5,7 +5,7 @@ import { oauthIdentities, users, eq } from '@verve/db'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'dummy_client_id'
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'dummy_client_secret'
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/v1/integrations/google/callback'
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI?.trim() || 'http://localhost:3001/v1/integrations/google/callback'
 
 const oauth2Client = new google.auth.OAuth2(
   GOOGLE_CLIENT_ID,

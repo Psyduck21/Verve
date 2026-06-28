@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+import { shouldRedirectToOnboarding, shouldRedirectFromOnboarding } from "@/lib/onboarding"
 
 export async function middleware(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
@@ -33,91 +34,56 @@ export async function middleware(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    const isAppRoute = request.nextUrl.pathname.startsWith('/dashboard') || 
-                       request.nextUrl.pathname.startsWith('/calendar') ||
-                       request.nextUrl.pathname.startsWith('/tasks') ||
-                       request.nextUrl.pathname.startsWith('/analytics') ||
-                       request.nextUrl.pathname.startsWith('/integrations') ||
-                       request.nextUrl.pathname.startsWith('/settings') ||
-                       request.nextUrl.pathname.startsWith('/profile') ||
-                       request.nextUrl.pathname.startsWith('/inbox')
+    const pathname = request.nextUrl.pathname
 
-    const isOnboardingRoute = request.nextUrl.pathname.startsWith('/onboarding')
+    // Protected app routes that require authentication
+    const isAppRoute = pathname.startsWith('/dashboard') ||
+                       pathname.startsWith('/calendar') ||
+                       pathname.startsWith('/tasks') ||
+                       pathname.startsWith('/analytics') ||
+                       pathname.startsWith('/integrations') ||
+                       pathname.startsWith('/settings') ||
+                       pathname.startsWith('/profile') ||
+                       pathname.startsWith('/inbox')
 
-    const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || 
-                        request.nextUrl.pathname.startsWith('/signup')
+    // /onboarding is now in the (auth) group — requires auth but NOT the app shell
+    const isOnboardingRoute = pathname.startsWith('/onboarding')
 
-    // If unauthenticated and trying to access an app route, redirect to login
+    // Pure auth routes — unauthenticated only
+    const isPureAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/signup')
+
+    // 1. Unauthenticated → redirect to login for any protected route
     if (!user && (isAppRoute || isOnboardingRoute)) {
         const url = request.nextUrl.clone()
         url.pathname = '/login'
         return NextResponse.redirect(url)
     }
 
-    // If authenticated and trying to access auth routes, redirect to dashboard
-    if (user && isAuthRoute) {
+    // 2. Authenticated → redirect away from login/signup to dashboard
+    if (user && isPureAuthRoute) {
         const url = request.nextUrl.clone()
-        url.pathname = '/onboarding'
+        url.pathname = '/dashboard'
         return NextResponse.redirect(url)
     }
 
-    // Check onboarding status for authenticated users
+    // 3. Authenticated + accessing an app route → check onboarding completion
     if (user && isAppRoute) {
-        try {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session) {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/onboarding/status`, {
-                    headers: {
-                        'Authorization': `Bearer ${session.access_token}`,
-                    },
-                })
-                
-                if (response.ok) {
-                    const data = await response.json()
-                    if (!data.data.completed) {
-                        const url = request.nextUrl.clone()
-                        url.pathname = '/onboarding'
-                        return NextResponse.redirect(url)
-                    }
-                }
-            }
-        } catch (error) {
-            // If onboarding check fails, allow user to proceed
-            console.error('Onboarding check failed:', error)
+        const shouldGoToOnboarding = await shouldRedirectToOnboarding()
+        if (shouldGoToOnboarding) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/onboarding'
+            return NextResponse.redirect(url)
         }
     }
 
-    // If authenticated and onboarding is completed, redirect to dashboard
+    // 4. Authenticated + on /onboarding → if already completed, send to dashboard
     if (user && isOnboardingRoute) {
-        try {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session) {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/onboarding/status`, {
-                    headers: {
-                        'Authorization': `Bearer ${session.access_token}`,
-                    },
-                })
-                
-                if (response.ok) {
-                    const data = await response.json()
-                    if (data.data.completed) {
-                        const url = request.nextUrl.clone()
-                        url.pathname = '/dashboard'
-                        return NextResponse.redirect(url)
-                    }
-                }
-            }
-        } catch (error) {
-            // If onboarding check fails, allow user to stay on onboarding
-            console.error('Onboarding check failed:', error)
+        const shouldGoToDashboard = await shouldRedirectFromOnboarding()
+        if (shouldGoToDashboard) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/dashboard'
+            return NextResponse.redirect(url)
         }
-    }
-
-    // If root route, redirect depending on auth status
-    if (request.nextUrl.pathname === '/') {
-        const url = request.nextUrl.clone()
-        url.pathname = user ? '/dashboard' : '/login'
-        return NextResponse.redirect(url)
     }
 
     return supabaseResponse
@@ -130,7 +96,6 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
-         * Feel free to modify this pattern to include more paths.
          */
         '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],

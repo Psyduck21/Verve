@@ -17,6 +17,8 @@ export default function ProfileView() {
         name: "",
         email: "",
         role: "",
+        aiUsed: 0,
+        aiLimit: 0,
     })
 
     useEffect(() => {
@@ -25,6 +27,8 @@ export default function ProfileView() {
                 name: userProfileData.data.full_name || "",
                 email: userProfileData.data.email || "",
                 role: userProfileData.data.grind_type || "",
+                aiUsed: userProfileData.data.ai_requests_used_today || 0,
+                aiLimit: userProfileData.data.ai_request_limit || 50,
             })
         }
     }, [userProfileData])
@@ -54,6 +58,12 @@ export default function ProfileView() {
                         <div>
                             <h2 className="text-xl font-semibold text-foreground">Profile Settings</h2>
                             <p className="text-sm text-muted-foreground mt-1">Manage your public profile and personal details.</p>
+                        </div>
+
+                        {/* AI Quota */}
+                        <div className="p-4 border border-border rounded-lg bg-background/50">
+                            <p className="text-sm font-medium text-foreground">AI Requests</p>
+                            <p className="text-xs text-muted-foreground mt-1">{profile.aiUsed} of {profile.aiLimit} used today</p>
                         </div>
 
                         {/* Avatar Upload */}

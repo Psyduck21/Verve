@@ -12,12 +12,11 @@ export const rateLimitPlugin = fp(async (app: FastifyInstance) => {
       const sessionId = (req as any).cookies?.['focal_session_id']
       return sessionId ? `rl:session:${sessionId}` : `rl:ip:${req.ip}`
     },
-    errorResponseBuilder: () => ({
-      success: false,
-      error: {
-        code:    'RATE_LIMIT_EXCEEDED',
-        message: 'Too many requests. Please slow down.',
-      },
-    })
+    errorResponseBuilder: () => {
+      const err = new Error('Too many requests. Please slow down.') as any
+      err.statusCode = 429
+      err.code = 'RATE_LIMIT_EXCEEDED'
+      return err
+    }
   })
 })

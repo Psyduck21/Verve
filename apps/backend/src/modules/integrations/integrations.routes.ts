@@ -8,23 +8,26 @@ import { TasksService } from '../tasks/tasks.service'
 export const integrationsRoutes: FastifyPluginAsync = async (app) => {
 
   // POST /v1/integrations/external-tasks
-  app.post('/external-tasks', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/external-tasks', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const body = ExternalTaskRequestSchema.parse(req.body)
 
-    let inboxRoutine = await db.query.routines.findFirst({
+    let inboxRoutineId = (await db.query.routines.findFirst({
       where: (r, { eq, and }) => and(eq(r.user_id, user.id), eq(r.title, 'Inbox')),
-    })
+    }))?.id
 
-    if (!inboxRoutine) {
-      const [newRoutine] = await db.insert(routines).values({
-        user_id: user.id,
-        title: 'Inbox',
-        goal: 'Unsorted external tasks and ideas',
-        is_active: true,
-        sort_order: -1,
-      }).returning()
-      inboxRoutine = newRoutine
+    if (!inboxRoutineId) {
+      const [newRoutine] = await db
+        .insert(routines)
+        .values({
+          user_id: user.id,
+          title: 'Inbox',
+          goal: 'Unsorted external tasks and ideas',
+          is_active: true,
+          sort_order: -1,
+        })
+        .returning({ id: routines.id })
+      inboxRoutineId = newRoutine.id
     }
 
     // Check if task exists using the new table
@@ -43,16 +46,14 @@ export const integrationsRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ success: true, message: 'Task already synced', data: existingTask })
     }
 
-    const today = new Date()
-    today.setHours(9, 0, 0, 0)
-    const scheduledAt = body.scheduled_at ? new Date(body.scheduled_at) : today
+    const scheduledAt = body.scheduled_at ? new Date(body.scheduled_at) : null
     const duration = body.estimated_duration_minutes || 30
 
     const task = await TasksService.createTask(user.id, {
       title: body.title,
       description: body.description,
       category: body.category,
-      routine_id: inboxRoutine.id,
+      routine_id: inboxRoutineId,
       priority: body.priority || 'medium',
       status: 'not_started',
       scheduled_at: scheduledAt,

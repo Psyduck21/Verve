@@ -3,6 +3,14 @@ import { z } from 'zod'
 import { db } from '../../lib/db'
 import { users, tasks, routines, tombstones } from '@verve/db'
 import { eq } from '@verve/db'
+import { supabase } from '../../lib/supabase'
+
+function deriveFullName(email: string, userMetadata: any) {
+  return userMetadata?.full_name
+    || userMetadata?.name
+    || email.split('@')[0]
+    || 'User'
+}
 
 const UpdatePreferencesSchema = z.object({
   full_name: z.string().optional(),
@@ -13,7 +21,54 @@ const UpdatePreferencesSchema = z.object({
   preferences: z.any().optional()
 })
 
+const WebhookSchema = z.object({
+  event: z.string(),
+  type: z.string(),
+  record: z.object({
+    id: z.string(),
+    email: z.string(),
+    created_at: z.string(),
+    user_metadata: z.any().optional(),
+  }),
+})
+
 export const usersRoutes: FastifyPluginAsync = async (app) => {
+  // POST /v1/users/webhook - Supabase auth webhook
+  app.post('/webhook', async (req, reply) => {
+    const parsed = WebhookSchema.safeParse(req.body)
+    
+    if (!parsed.success) {
+      return reply.status(400).send({ success: false, error: 'Invalid webhook payload' })
+    }
+
+    const { event, record } = parsed.data
+
+    // Handle user creation event
+    if (event === 'user.created' || event === 'user.signed_up') {
+      try {
+        // Use insert with onConflictDoNothing to prevent race conditions
+        // If the user already exists, this will do nothing (no error)
+        await db.insert(users).values({
+          id: record.id,
+          email: record.email,
+          full_name: deriveFullName(record.email, record.user_metadata),
+          onboarding_completed: false,
+          onboarding_step: 0,
+          ai_requests_used_today: 0,
+        }).onConflictDoNothing({
+          target: users.id, // Primary key constraint
+        })
+        
+        console.log(`[Webhook] Processed user creation for ${record.email}`)
+      } catch (error) {
+        console.error('[Webhook] Error creating user:', error)
+        // Don't fail the webhook response - Supabase will retry on error
+      }
+    }
+
+    return reply.send({ success: true })
+  })
+
   // GET /v1/users/profile
   app.get('/profile', { preHandler: [app.authenticate] }, async (req, reply) => {
     const user = req.user!
@@ -23,11 +78,14 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(404).send({ success: false, error: 'User not found' })
     }
     
-    return reply.send({ success: true, data: profile[0] })
+    // Include AI quota information (limit is server-defined)
+    const aiRequestLimit = 50
+    const enrichedProfile = { ...profile[0], ai_request_limit: aiRequestLimit }
+    return reply.send({ success: true, data: enrichedProfile })
   })
 
   // PUT /v1/users/preferences
-  app.put('/preferences', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.put('/preferences', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const parsed = UpdatePreferencesSchema.safeParse(req.body)
     
@@ -64,7 +122,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // DELETE /v1/users/me
-  app.delete('/me', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.delete('/me', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
 
     await db.transaction(async (tx) => {

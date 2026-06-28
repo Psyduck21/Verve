@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import { Bell, Search, Plus, ChevronRight } from "lucide-react"
+import { VerveLogo } from "@/components/ui/VerveLogo"
 import { Icon } from "@/components/ui/Icon"
 import { cn } from "@/lib/utils"
 import { usePathname } from "next/navigation"
@@ -20,6 +21,7 @@ interface TopHeaderProps {
     onTabChange?: (id: string) => void
     actions?: React.ReactNode
     onNewTask?: () => void
+    onOpenAssistant?: () => void
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -30,6 +32,7 @@ export function TopHeader({
     onTabChange,
     actions,
     onNewTask,
+    onOpenAssistant,
 }: TopHeaderProps) {
     const pathname = usePathname()
     const pathSegments = pathname?.split('/').filter(Boolean) || []
@@ -41,6 +44,7 @@ export function TopHeader({
         >
             <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                    <VerveLogo className="w-4 h-4 mr-0.5" />
                     <span className="cursor-pointer hover:text-foreground transition-colors">Verve</span>
                     {pathSegments.map((segment, index) => (
                         <React.Fragment key={index}>
@@ -90,12 +94,12 @@ export function TopHeader({
                 {/* Slot for page-specific actions */}
                 {actions}
 
-                {/* Global Add Button */}
+                {/* AI assistant entry point */}
                 <button
-                    onClick={onNewTask}
+                    onClick={onOpenAssistant ?? onNewTask}
                     className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors ml-2"
-                    data-purpose="global-add-btn"
-                    title="New Task (/)"
+                    data-purpose="assistant-open-btn"
+                    title="Open AI assistant (Alt+A)"
                 >
                     <Icon icon={Plus} size="sm" />
                 </button>

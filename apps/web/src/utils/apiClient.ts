@@ -21,13 +21,30 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
         headers.set("Authorization", `Bearer ${session.access_token}`)
     }
 
+    // For mutation requests (POST/PUT/DELETE), fetch CSRF token from backend and include it
+    const method = (options.method || 'GET').toUpperCase()
+    if (method !== 'GET') {
+        try {
+            const tokenRes = await fetch(`${API_BASE_URL}/v1/csrf-token`, { credentials: 'include' })
+            if (tokenRes.ok) {
+                const tokenJson = await tokenRes.json().catch(() => ({} as any))
+                if (tokenJson?.csrfToken) {
+                    headers.set('x-csrf-token', tokenJson.csrfToken)
+                }
+            }
+        } catch (err) {
+            // If CSRF token fetch fails, we'll still attempt the request and let the server return 403
+        }
+    }
+
     const url = new URL(`${API_BASE_URL}${endpoint}`)
     if (options.body && typeof options.body === 'object') {
         // Handle query params for GET requests
-        if (options.method === 'GET') {
+        if (options.method === 'GET' || !options.method) {
             Object.entries(options.body as Record<string, any>).forEach(([key, value]) => {
                 url.searchParams.append(key, String(value))
             })
+            delete options.body
         }
     }
 
@@ -46,10 +63,73 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 }
 
 export const apiClient = {
+    // --- Onboarding Module ---
+    onboarding: {
+        getStatus: async () => {
+            return fetchWithAuth("/v1/onboarding/status")
+        },
+        saveStep: async (step: number, data?: any, duration_ms?: number) => {
+            return fetchWithAuth(`/v1/onboarding/step/${step}`, {
+                method: "POST",
+                body: JSON.stringify({ data, duration_ms }),
+            })
+        },
+        generateRoutine: async (data: any) => {
+            return fetchWithAuth("/v1/onboarding/generate-routine", {
+                method: "POST",
+                body: JSON.stringify(data),
+            })
+        },
+        complete: async (data: {
+            completed_at?: string
+            total_duration_ms?: number
+            skipped_steps?: number[]
+            generated_routine?: any[]
+            challenge?: string
+            buffer_preference?: string
+            skipped_integrations?: string[]
+            first_task_created?: boolean
+            first_task_title?: string
+        }) => {
+            return fetchWithAuth("/v1/onboarding/complete", {
+                method: "POST",
+                body: JSON.stringify(data),
+            })
+        },
+        skip: async (data: { skip_from_step?: number; reason?: string }) => {
+            return fetchWithAuth("/v1/onboarding/skip", {
+                method: "POST",
+                body: JSON.stringify(data),
+            })
+        },
+    },
+
     // --- Tasks Module ---
     tasks: {
-        getTasks: async () => {
-            return fetchWithAuth("/v1/dashboard/summary").then(res => res.data?.tasks || [])
+        getTasks: async (params?: { cursor?: string; limit?: number; start_date?: string; end_date?: string }) => {
+            const allTasks: any[] = []
+            let cursor: string | null = params?.cursor ?? null
+
+            do {
+                const endpoint = new URL("/v1/tasks", API_BASE_URL)
+                endpoint.searchParams.set("limit", String(params?.limit ?? 100))
+                if (cursor) {
+                    endpoint.searchParams.set("cursor", cursor)
+                }
+                if (params?.start_date) {
+                    endpoint.searchParams.set("start_date", params.start_date)
+                }
+                if (params?.end_date) {
+                    endpoint.searchParams.set("end_date", params.end_date)
+                }
+
+                const page = await fetchWithAuth(endpoint.pathname + endpoint.search)
+                const tasks = Array.isArray(page?.data) ? page.data : []
+                allTasks.push(...tasks)
+                cursor = page?.pagination?.nextCursor || null
+            } while (cursor)
+
+            return allTasks
         },
         createTask: async (task: any) => {
             return fetchWithAuth("/v1/tasks", {
@@ -115,6 +195,17 @@ export const apiClient = {
                 method: "POST",
                 body: JSON.stringify(category),
             }).then(res => res.data)
+        },
+        updateCategory: async (id: string, data: { name?: string, color?: string }) => {
+            return fetchWithAuth(`/v1/categories/${id}`, {
+                method: "PUT",
+                body: JSON.stringify(data),
+            })
+        },
+        deleteCategory: async (id: string) => {
+            return fetchWithAuth(`/v1/categories/${id}`, {
+                method: "DELETE",
+            })
         }
     },
 
@@ -127,16 +218,16 @@ export const apiClient = {
 
     // --- AI Module ---
     ai: {
-        generateRoutine: async (prompt: string, goal?: string) => {
-            return fetchWithAuth("/v1/ai/routine", {
+        generateRoutine: async (data: any) => {
+            return fetchWithAuth("/v1/ai/generate-routine", {
                 method: "POST",
-                body: JSON.stringify({ prompt, goal }),
+                body: JSON.stringify(data),
             })
         },
-        rescheduleTasks: async (taskIds: string[], context: string) => {
+        rescheduleTasks: async (command: string, tasks: any[]) => {
             return fetchWithAuth("/v1/ai/reschedule", {
                 method: "POST",
-                body: JSON.stringify({ taskIds, context }),
+                body: JSON.stringify({ command, context: { tasks } }),
             })
         },
         parseTask: async (raw_input: string, local_time_string: string, timezone: string) => {
@@ -154,6 +245,18 @@ export const apiClient = {
                     timezone, 
                     context: { tasks: context_tasks } 
                 }),
+            })
+        },
+        assistantPlan: async (prompt: string, context?: any) => {
+            return fetchWithAuth("/v1/ai/assistant/plan", {
+                method: "POST",
+                body: JSON.stringify({ prompt, context }),
+            })
+        },
+        assistantExecute: async (planId: string, actions: any[]) => {
+            return fetchWithAuth("/v1/ai/assistant/execute", {
+                method: "POST",
+                body: JSON.stringify({ plan_id: planId, actions }),
             })
         },
     },
@@ -182,6 +285,15 @@ export const apiClient = {
         },
         getWeeklyInsights: async () => {
             return fetchWithAuth("/v1/analytics/weekly-report")
+        },
+        getTrends: async () => {
+            return fetchWithAuth("/v1/analytics/trends")
+        },
+        getHeatmap: async () => {
+            return fetchWithAuth("/v1/analytics/heatmap")
+        },
+        getStreaks: async () => {
+            return fetchWithAuth("/v1/analytics/streaks")
         }
     },
 
@@ -303,6 +415,30 @@ export const apiClient = {
         duplicate: async (id: string) => {
             return fetchWithAuth(`/v1/templates/${id}/duplicate`, {
                 method: "POST",
+            })
+        }
+    },
+
+    // --- Routines Module ---
+    routines: {
+        getRoutines: async () => {
+            return fetchWithAuth("/v1/routines")
+        },
+        createRoutine: async (data: { title: string; goal?: string }) => {
+            return fetchWithAuth("/v1/routines", {
+                method: "POST",
+                body: JSON.stringify(data),
+            })
+        },
+        updateRoutine: async (id: string, data: any) => {
+            return fetchWithAuth(`/v1/routines/${id}`, {
+                method: "PUT",
+                body: JSON.stringify(data),
+            })
+        },
+        deleteRoutine: async (id: string) => {
+            return fetchWithAuth(`/v1/routines/${id}`, {
+                method: "DELETE",
             })
         }
     }

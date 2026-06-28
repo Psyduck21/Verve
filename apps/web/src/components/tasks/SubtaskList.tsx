@@ -49,9 +49,17 @@ export function SubtaskList({
   return (
     <div className="mt-2 ml-4 border-l-2 border-border pl-4">
       {/* Header */}
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setIsExpanded(!isExpanded)
+          }
+        }}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full cursor-pointer"
       >
         {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         <span>Subtasks ({completedCount}/{totalCount})</span>
@@ -73,7 +81,7 @@ export function SubtaskList({
         >
           <Plus size={14} />
         </button>
-      </button>
+      </div>
 
       {/* Add Subtask Input */}
       <AnimatePresence>

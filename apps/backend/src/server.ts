@@ -3,9 +3,48 @@ startTelemetry()
 
 import dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
+
+// Validate required environment variables
+const requiredEnvVars = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_JWT_SECRET',
+  'OPENROUTER_API_KEY',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+  // 'POWERSYNC_PRIVATE_KEY',
+]
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName])
+if (process.env.NODE_ENV === 'production' && !process.env.SENTRY_DSN) {
+  missingVars.push('SENTRY_DSN')
+}
+
+if (missingVars.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`)
+}
+
+// Validate RSA key format for PowerSync
+function validateRSAPrivateKey(key: string): boolean {
+  try {
+    // RSA private keys start with -----BEGIN PRIVATE KEY----- or -----BEGIN RSA PRIVATE KEY-----
+    return key.includes('-----BEGIN') && key.includes('PRIVATE KEY')
+  } catch {
+    return false
+  }
+}
+
+if (process.env.POWERSYNC_PRIVATE_KEY) {
+  if (!validateRSAPrivateKey(process.env.POWERSYNC_PRIVATE_KEY)) {
+    throw new Error('POWERSYNC_PRIVATE_KEY must be a valid RSA private key in PEM format')
+  }
+}
+
 import Fastify from 'fastify'
 import * as Sentry from '@sentry/node'
 import fastifyCookie from '@fastify/cookie'
+import swagger from '@fastify/swagger'
+import swaggerUI from '@fastify/swagger-ui'
 import { corsPlugin } from './plugins/cors.plugin'
 import { helmetPlugin } from './plugins/helmet.plugin'
 import { rateLimitPlugin } from './plugins/rate-limit.plugin'
@@ -33,6 +72,7 @@ import { categoriesRoutes } from './modules/categories/categories.routes'
 import { onboardingRoutes } from './modules/onboarding/onboarding.routes'
 import { timeblocksRoutes } from './modules/timeblocks/timeblocks.routes'
 import { templatesRoutes } from './modules/templates/templates.routes'
+import { routinesRoutes } from './modules/routines/routines.routes'
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN || '',
@@ -64,6 +104,29 @@ async function bootstrap() {
   await app.register(auditPlugin)
   await app.register(notificationWorkerPlugin)
 
+  // ── Swagger API Documentation ─────────────────────────────
+  await app.register(swagger, {
+    swagger: {
+      info: {
+        title: 'Verve API',
+        description: 'Verve backend API documentation',
+        version: '1.0.0',
+      },
+      host: 'localhost:3001',
+      schemes: ['http', 'https'],
+      consumes: ['application/json'],
+      produces: ['application/json'],
+    }
+  })
+  
+  await app.register(swaggerUI, {
+    routePrefix: '/documentation',
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: false
+    }
+  })
+
   // ── Global error handler ──────────────────────────────────
   app.setErrorHandler((error, request, reply) => {
     Sentry.captureException(error)
@@ -77,6 +140,14 @@ async function bootstrap() {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV ?? 'development',
   }))
+
+    // ── CSRF token endpoint (no auth) ─────────────────────────
+    // Provides a one-time CSRF token for clients to include in mutation requests
+    app.get('/v1/csrf-token', async (request, reply) => {
+      // The @fastify/csrf-protection plugin exposes `request.csrfToken()`
+      const token = (request as any).csrfToken?.()
+      return reply.send({ success: true, csrfToken: token })
+    })
 
   // ── Comprehensive health check with dependencies ─────────────
   app.get('/health/detailed', async (request, reply) => {
@@ -161,11 +232,21 @@ async function bootstrap() {
   await app.register(adminRoutes, { prefix: '/v1/admin' })
   await app.register(categoriesRoutes, { prefix: '/v1/categories' })
   await app.register(onboardingRoutes, { prefix: '/v1/onboarding' })
+  await app.register(routinesRoutes, { prefix: '/v1/routines' })
 
   // ── Start ─────────────────────────────────────────────────
   try {
     await app.listen({ port: PORT, host: '0.0.0.0' })
     app.log.info(`🚀 Verve backend running on port ${PORT}`)
+
+    // Verify Redis connectivity on boot so we know Upstash is actually reachable.
+    try {
+      const start = Date.now()
+      await redis.ping()
+      app.log.info({ latencyMs: Date.now() - start }, '✅ Upstash Redis connected')
+    } catch (error) {
+      app.log.warn({ err: error }, '⚠️ Upstash Redis ping failed')
+    }
   } catch (err) {
     app.log.error(err)
     process.exit(1)

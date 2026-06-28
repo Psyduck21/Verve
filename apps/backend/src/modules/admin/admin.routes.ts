@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { db } from '../../lib/db'
-import { users, aiRequestLog, routines, tasks } from '@verve/db'
+import { users, aiRequestLog, auditLog, routines, tasks } from '@verve/db'
 import { eq, desc, count } from '@verve/db'
 
 export const adminRoutes: FastifyPluginAsync = async (app) => {
@@ -10,8 +10,8 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const user = req.user!
     const dbUser = await db.select().from(users).where(eq(users.id, user.id)).then(r => r[0])
     
-    // Hardcoded for demonstration - only allow specific emails to access admin routes
-    if (!dbUser || !dbUser.email.endsWith('@verve.app')) {
+    // Check if user has superadmin role
+    if (!dbUser || dbUser.role !== 'superadmin') {
       return reply.code(403).send({ error: 'Forbidden: Superadmin only' })
     }
   })
@@ -39,6 +39,60 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
         recentAiUsage: recentAiLogs
       }
     })
+  })
+
+  // GET /v1/admin/logs/summary
+  // Compact monitoring feed: success/error status only, no raw metadata payloads.
+  app.get('/logs/summary', async (req, reply) => {
+    const { limit: rawLimit } = req.query as { limit?: string }
+    const limit = Math.min(Math.max(Number(rawLimit) || 25, 1), 100)
+
+    const [aiLogs, auditLogs] = await Promise.all([
+      db.select({
+        id: aiRequestLog.id,
+        success: aiRequestLog.success,
+        error_code: aiRequestLog.error_code,
+        created_at: aiRequestLog.created_at,
+        request_type: aiRequestLog.request_type,
+      })
+        .from(aiRequestLog)
+        .orderBy(desc(aiRequestLog.created_at))
+        .limit(limit),
+      db.select({
+        id: auditLog.id,
+        success: auditLog.success,
+        event_type: auditLog.event_type,
+        created_at: auditLog.created_at,
+      })
+        .from(auditLog)
+        .orderBy(desc(auditLog.created_at))
+        .limit(limit),
+    ])
+
+    const rows = [
+      ...aiLogs.map((log) => ({
+        id: log.id,
+        type: 'ai_request' as const,
+        status: log.success ? 'success' : 'error',
+        success: log.success,
+        error_code: log.error_code,
+        event_type: log.request_type,
+        created_at: log.created_at,
+      })),
+      ...auditLogs.map((log) => ({
+        id: log.id,
+        type: 'audit' as const,
+        status: log.success ? 'success' : 'error',
+        success: log.success,
+        error_code: log.success ? null : 'REQUEST_FAILED',
+        event_type: log.event_type,
+        created_at: log.created_at,
+      })),
+    ]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, limit)
+
+    return reply.send({ success: true, data: rows })
   })
 
   // POST /v1/admin/impersonate

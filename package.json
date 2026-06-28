@@ -1,8 +1,8 @@
 {
-  "name": "focal",
+  "name": "Verve",
   "private": true,
   "version": "0.1.0",
-  "description": "Focal — Your Day, In Focus. AI-powered scheduler for web and mobile.",
+  "description": "Verve — Your Day, In Focus. AI-powered scheduler for web and mobile.",
   "scripts": {
     "dev": "turbo run dev --parallel",
     "dev:web": "turbo run dev --filter=@verve/web",
@@ -15,14 +15,21 @@
     "db:generate": "turbo run db:generate --filter=@verve/db",
     "db:migrate": "turbo run db:migrate --filter=@verve/db",
     "db:studio": "turbo run db:studio --filter=@verve/db",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "test:perf:load": "artillery run performance-tests/load_test.yml -o performance-tests/reports/load_report.json",
+    "test:perf:stress": "artillery run performance-tests/stress_test.yml -o performance-tests/reports/stress_report.json",
+    "test:perf:spike": "artillery run performance-tests/spike_test.yml -o performance-tests/reports/spike_report.json",
+    "test:perf:dau": "artillery run performance-tests/dau_test.yml -o performance-tests/reports/dau_report.json",
+    "test:perf:regression": "artillery run performance-tests/regression_test.yml -o performance-tests/reports/regression_report.json"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
     "turbo": "^2.5.0",
     "typescript": "^5.5.0",
-    "@types/node": "^22.0.0",
-    "prettier": "^3.3.0",
-    "eslint": "^9.0.0"
+    "typescript-eslint": "^8.62.0"
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {

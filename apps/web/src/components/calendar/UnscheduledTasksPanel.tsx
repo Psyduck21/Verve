@@ -3,11 +3,12 @@
 import { useTasks } from "@/hooks/useTasks"
 import { Icon } from "@/components/ui/Icon"
 import { GripVertical, Clock, AlertCircle } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // Module-level variable to hold the dragged task payload for react-big-calendar
 export let draggedTaskPayload: any = null
 
-export function UnscheduledTasksPanel({ isOpen, onTaskClick }: { isOpen: boolean, onTaskClick?: (task: any) => void }) {
+export function UnscheduledTasksPanel({ isOpen, onTaskClick, className }: { isOpen: boolean, onTaskClick?: (task: any) => void, className?: string }) {
     const { data: tasks, isLoading } = useTasks()
 
     // Filter tasks that do not have a scheduled_at date
@@ -21,14 +22,15 @@ export function UnscheduledTasksPanel({ isOpen, onTaskClick }: { isOpen: boolean
     }
 
     return (
-        <div 
-            className={`flex flex-col h-full shrink-0 bg-card border-border rounded-2xl shadow-sm overflow-hidden transition-all duration-300 ease-in-out ${
-                isOpen ? 'w-80 opacity-100 border ml-6' : 'w-0 opacity-0 border-none ml-0'
-            }`} 
+        <div
+            className={cn(
+                "flex flex-col h-full w-full bg-card border-border rounded-2xl shadow-sm overflow-hidden transition-all duration-300 ease-in-out",
+                className,
+                isOpen ? "opacity-100" : "opacity-0"
+            )}
             data-purpose="unscheduled-tasks-panel"
         >
-            <div className="w-80 flex flex-col h-full">
-                <div className="px-4 py-3 border-b border-border bg-muted/30">
+            <div className="px-4 py-3 border-b border-border bg-muted/30">
                 <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <AlertCircle size={16} className="text-primary" />
                     Unscheduled Tasks
@@ -37,7 +39,7 @@ export function UnscheduledTasksPanel({ isOpen, onTaskClick }: { isOpen: boolean
                     Drag and drop onto the calendar to schedule
                 </p>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {isLoading ? (
                     <div className="text-sm text-muted-foreground text-center py-8">Loading tasks...</div>
@@ -73,7 +75,6 @@ export function UnscheduledTasksPanel({ isOpen, onTaskClick }: { isOpen: boolean
                         </div>
                     ))
                 )}
-            </div>
             </div>
         </div>
     )

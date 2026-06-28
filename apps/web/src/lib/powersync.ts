@@ -53,12 +53,43 @@ export class SupabaseConnector {
     const tx = await database.getNextCrudTransaction()
     if (!tx) return
 
-    for (const op of tx.crud) {
-      // Forward offline writes to your Fastify API or Supabase
-      // e.g. await fetch(`/api/sync`, { method: 'POST', body: JSON.stringify(op) })
-    }
+    try {
+      const { data: { session } } = await this.supabase.auth.getSession()
+      if (!session) {
+        console.error('[PowerSync] No session for upload')
+        await tx.complete()
+        return
+      }
 
-    await tx.complete()
+      // Format CRUD operations for the backend sync API
+      const mutations = tx.crud.map((op: any) => ({
+        table: op.table,
+        operation: op.op === 'PUT' ? 'UPDATE' : op.op === 'DELETE' ? 'DELETE' : 'INSERT',
+        record: op.data
+      }))
+
+      // Send to backend sync push endpoint
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/sync/push`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ mutations })
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[PowerSync] Upload failed:', error)
+        throw new Error(error.error || 'Failed to sync data')
+      }
+
+      await tx.complete()
+    } catch (error) {
+      console.error('[PowerSync] Upload error:', error)
+      // Don't complete the transaction on error - PowerSync will retry
+      throw error
+    }
   }
 }
 

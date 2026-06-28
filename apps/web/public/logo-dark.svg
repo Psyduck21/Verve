@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M20 45 L45 80 L85 20" stroke="url(#gradient-dark)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="gradient-dark" x1="20" y1="20" x2="85" y2="80" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/> <!-- Violet-400 -->
+      <stop offset="1" stop-color="#F472B6"/> <!-- Pink-400 -->
+    </linearGradient>
+  </defs>
+</svg>

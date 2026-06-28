@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { VerveLogo } from "@/components/ui/VerveLogo"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -63,11 +64,11 @@ export function Sidebar({ userEmail, userName, avatarUrl, onAIToggle }: SidebarP
 
                     {/* ── Brand Logo ── */}
                     <div className="w-full flex justify-center items-center mt-2 shrink-0">
-                        <Link 
-                            href="/dashboard" 
-                            className="flex items-center justify-center w-8 h-8 rounded-lg bg-foreground text-background font-black text-xl hover:opacity-80 transition-opacity shadow-sm"
+                        <Link
+                            href="/dashboard"
+                            className="flex items-center justify-center w-8 h-8 rounded-lg bg-foreground/5 hover:bg-foreground/10 transition-colors shadow-sm border border-border"
                         >
-                            F
+                            <VerveLogo className="w-5 h-5" />
                         </Link>
                     </div>
 
@@ -164,7 +165,7 @@ function SidebarItem({ href, icon: IconComponent, label, active, showLabel, isRa
                         />
                     </div>
                 </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={12} className="bg-white text-black border border-border shadow-md">
+                <TooltipContent side="right" sideOffset={12} className="bg-popover text-popover-foreground border border-border shadow-md">
                     {label}
                 </TooltipContent>
             </Tooltip>

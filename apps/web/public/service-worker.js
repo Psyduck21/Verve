@@ -49,9 +49,15 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, networkResponse.clone());
-        });
+        // Only cache successful responses
+        if (networkResponse.ok && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache).catch(() => {
+              // Ignore cache errors
+            });
+          });
+        }
         return networkResponse;
       }).catch(() => {
         // If network fails and no cache, return offline page if it's a navigation request

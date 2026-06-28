@@ -1,13 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { db } from '../../lib/db'
 import { tasks, taskExternalMetadata } from '@verve/db'
-import { eq, and, gte, lte, count, sql } from '@verve/db'
-import { Redis } from '@upstash/redis'
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-})
+import { eq, and, gte, lte, count, sql, asc } from '@verve/db'
+import { redis } from '../../lib/redis'
 
 export const dashboardRoutes: FastifyPluginAsync = async (app) => {
   app.get('/summary', { preHandler: [app.authenticate] }, async (req, reply) => {
@@ -19,12 +14,18 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     const startOfDay = new Date(targetDate.setHours(0, 0, 0, 0))
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999))
     
-    const cacheKey = `dashboard:summary:${user.id}:${date || 'today'}`
+    const cacheDate = startOfDay.toISOString().split('T')[0]
+    const cacheKey = `dashboard:summary:${user.id}:${cacheDate}`
     
     // Try to get from cache first
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      return reply.send({ success: true, data: cached, cached: true })
+    try {
+      const cached = await redis.get(cacheKey)
+      if (cached) {
+        reply.header('Cache-Control', 'private, max-age=300')
+        return reply.send({ success: true, data: cached, cached: true })
+      }
+    } catch (error) {
+      app.log.warn({ err: error }, 'Dashboard cache read failed, continuing without cache')
     }
     
     // Single query with JOIN to fetch tasks and count meetings, filtered by date
@@ -37,6 +38,7 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
         priority: tasks.priority,
         scheduled_at: tasks.scheduled_at,
         estimated_duration_minutes: tasks.estimated_duration_minutes,
+        is_time_locked: tasks.is_time_locked,
         actual_duration_minutes: tasks.actual_duration_minutes,
         category: tasks.category,
         routine_id: tasks.routine_id,
@@ -53,6 +55,7 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
           lte(tasks.scheduled_at, endOfDay)
         )
       )
+      .orderBy(asc(tasks.scheduled_at))
     
     // Calculate basic stats from the joined result
     const tasksCompleted = userTasks.filter(t => t.status === 'completed').length
@@ -75,8 +78,14 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     }
     
     // Cache for 5 minutes (300 seconds)
-    await redis.set(cacheKey, responseData, { ex: 300 })
+    try {
+      await redis.set(cacheKey, responseData, { ex: 300 })
+    } catch (error) {
+      app.log.warn({ err: error }, 'Dashboard cache write failed')
+    }
     
+    // Set Cache-Control header
+    reply.header('Cache-Control', 'private, max-age=300')
     return reply.send({ success: true, data: responseData, cached: false })
   })
 }

@@ -199,6 +199,11 @@
         animation: shimmer 2s linear infinite;
     }
 
+    /* Modal backdrop overlay — lighter in light mode, darker in dark mode */
+    .bg-overlay {
+        background-color: hsl(var(--overlay));
+    }
+
     /* Sidebar state utilities */
     .sidebar-rail {
         width: 56px;

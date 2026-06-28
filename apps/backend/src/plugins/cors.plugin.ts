@@ -11,20 +11,23 @@ export const corsPlugin = fp(async (app: FastifyInstance) => {
 
   await app.register(cors, {
     origin: (origin: string | undefined, cb: (err: Error | null, allow: boolean) => void) => {
+      // Build allowed origins list - only allow localhost in explicit development mode
       const allowedOrigins = [
         'https://verve.app',
         'https://www.verve.app',
         'https://mail.google.com',
-        // Allow localhost in development
-        ...(process.env.NODE_ENV !== 'production'
-          ? ['http://localhost:3000', 'http://localhost:3001']
-          : []),
       ]
       
-      // Check if origin is a whitelisted chrome extension
+      // Only add localhost if explicitly in development mode (not just "not production")
+      if (process.env.NODE_ENV === 'development') {
+        allowedOrigins.push('http://localhost:3000', 'http://localhost:3001')
+      }
+      
+      // Check if origin is a chrome extension. Allow in development or if explicitly whitelisted.
       const isChromeExtension = origin && origin.startsWith('chrome-extension://')
-      const isExtensionAllowed = isChromeExtension && allowedExtensionIds.some(id => 
-        origin?.startsWith(`chrome-extension://${id}`)
+      const isExtensionAllowed = isChromeExtension && (
+        process.env.NODE_ENV === 'development' ||
+        allowedExtensionIds.some(id => origin?.startsWith(`chrome-extension://${id}`))
       )
 
       if (!origin || allowedOrigins.includes(origin) || isExtensionAllowed) {

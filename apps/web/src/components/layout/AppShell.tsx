@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect } from "react"
 import dynamic from "next/dynamic"
 import { Sidebar } from "./Sidebar"
 import { TopHeader } from "@/components/layout/TopHeader"
-import { AIPanel } from "./AIPanel"
+import { Toaster } from "@/components/ui/toaster"
 import { useTaskStore } from "@/store/useTaskStore"
 
 const UniversalModal = dynamic(
@@ -18,9 +18,18 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, user }: AppShellProps) {
-    const [aiOpen, setAiOpen] = useState(false)
     const { isTaskModalOpen, modalMode, setIsTaskModalOpen, openModal } = useTaskStore()
-    
+
+    useEffect(() => {
+        const handleOpenAi = () => openModal("ai")
+        window.addEventListener("open_ai_assistant", handleOpenAi)
+        window.addEventListener("open_ai_omnibox", handleOpenAi)
+        return () => {
+            window.removeEventListener("open_ai_assistant", handleOpenAi)
+            window.removeEventListener("open_ai_omnibox", handleOpenAi)
+        }
+    }, [openModal])
+
     const email = user?.email || "guest@verve.app"
     const name = user?.user_metadata?.full_name || "Guest"
     const avatarUrl = user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=2563eb&color=fff`
@@ -31,20 +40,24 @@ export function AppShell({ children, user }: AppShellProps) {
                 userEmail={email}
                 userName={name}
                 avatarUrl={avatarUrl}
-                onAIToggle={() => setAiOpen(true)}
+                onAIToggle={() => openModal("ai")}
             />
             
             <main className="flex-1 min-w-0 h-full flex flex-col relative z-0 overflow-hidden">
-                <TopHeader title="Verve" onNewTask={() => openModal("task")} />
+                <TopHeader 
+                    title="Verve"
+                    onNewTask={() => openModal("task")}
+                    onOpenAssistant={() => openModal("ai")}
+                />
                 {children}
             </main>
 
-            <AIPanel open={aiOpen} onClose={() => setAiOpen(false)} />
             <UniversalModal
                 open={isTaskModalOpen}
                 initialMode={modalMode}
                 onClose={() => setIsTaskModalOpen(false)}
             />
+            <Toaster />
         </div>
     )
 }

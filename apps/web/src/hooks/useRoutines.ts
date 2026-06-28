@@ -1,13 +1,16 @@
 "use client"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { createClient } from "@/utils/supabase/client"
+import { apiClient } from "@/utils/apiClient"
 
 export type Routine = {
     id: string
     user_id: string
     title: string
     goal: string | null
+    icon?: string | null
+    color: string
     is_active: boolean
+    is_default: boolean
     sort_order: number
     ai_generated_at: string | null
     ai_model_used: string | null
@@ -16,43 +19,31 @@ export type Routine = {
     created_at: string
     updated_at: string
     deleted_at: string | null
+    task_count?: number
 }
 
 export function useRoutines() {
-    const supabase = createClient()
-
     return useQuery<Routine[]>({
         queryKey: ["routines"],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from("routines")
-                .select("*")
-                .is("deleted_at", null)
-                .order("sort_order", { ascending: true })
-
-            if (error) throw error
-            return data ?? []
+            const res = await apiClient.routines.getRoutines()
+            if (!res.success) throw new Error(res.error || "Failed to fetch routines")
+            return res.data as Routine[]
         },
     })
 }
 
 export function useCreateRoutine() {
-    const supabase = createClient()
     const queryClient = useQueryClient()
 
     return useMutation({
         mutationFn: async (newRoutine: Pick<Routine, "title" | "goal">) => {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) throw new Error("Not authenticated")
-
-            const { data, error } = await supabase
-                .from("routines")
-                .insert({ ...newRoutine, user_id: user.id })
-                .select()
-                .single()
-
-            if (error) throw error
-            return data as Routine
+            const res = await apiClient.routines.createRoutine({
+                title: newRoutine.title,
+                goal: newRoutine.goal || undefined,
+            })
+            if (!res.success) throw new Error(res.error || "Failed to create routine")
+            return res.data as Routine
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["routines"] })
@@ -61,17 +52,13 @@ export function useCreateRoutine() {
 }
 
 export function useUpdateRoutine() {
-    const supabase = createClient()
     const queryClient = useQueryClient()
 
     return useMutation({
         mutationFn: async (updates: Partial<Routine> & { id: string }) => {
             const { id, ...data } = updates
-            const { error } = await supabase
-                .from("routines")
-                .update(data)
-                .eq("id", id)
-            if (error) throw error
+            const res = await apiClient.routines.updateRoutine(id, data)
+            if (!res.success) throw new Error(res.error || "Failed to update routine")
             return updates
         },
         onMutate: async (updatedRoutine) => {
@@ -92,6 +79,22 @@ export function useUpdateRoutine() {
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ["routines"] })
+        },
+    })
+}
+
+export function useDeleteRoutine() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async (id: string) => {
+            const res = await apiClient.routines.deleteRoutine(id)
+            if (!res.success) throw new Error(res.error || "Failed to delete routine")
+            return id
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["routines"] })
+            queryClient.invalidateQueries({ queryKey: ["tasks"] })
         },
     })
 }

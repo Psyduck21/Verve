@@ -48,7 +48,8 @@ export async function callOpenRouter<T>(params: {
               { role: 'system', content: params.systemPrompt },
               { role: 'user', content: params.userPrompt },
             ]
-          })
+          }),
+          signal: AbortSignal.timeout(15000)
         })
 
         if (!response.ok) {
@@ -116,7 +117,8 @@ export async function* callOpenRouterStream(params: {
             { role: 'system', content: params.systemPrompt },
             { role: 'user', content: params.userPrompt },
           ]
-        })
+        }),
+        signal: AbortSignal.timeout(15000)
       })
 
       if (!response.ok) {

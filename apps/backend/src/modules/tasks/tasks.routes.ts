@@ -4,22 +4,19 @@ import { TasksService, CreateSubtaskSchema } from './tasks.service'
 import { sanitizeHtml } from '../../lib/sanitize'
 import { db } from '../../lib/db'
 import { tasks } from '@verve/db'
-import { eq, desc, lt, gt, and } from '@verve/db'
-
+import { eq, desc, lt, gt, gte, lte, and, isNull } from '@verve/db'
+import { taskExternalMetadata } from '@verve/db'
+import { TaskListQuerySchema } from './tasks.routes.validation'
 const CreateTaskSchema = z.object({
-  routine_id: z.string().uuid().optional(),
+  routine_id: z.string().uuid().nullable().optional(),
   title: z.string(),
   description: z.string().optional().nullable(),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   status: z.enum(['not_started', 'in_progress', 'completed', 'missed', 'cancelled']).optional(),
   category: z.string().optional().nullable(),
-  scheduled_at: z.string().datetime({ offset: true }).or(z.date()),
+  scheduled_at: z.string().datetime({ offset: true }).or(z.date()).nullable().optional(),
   estimated_duration_minutes: z.number().optional(),
-})
-
-const PaginationSchema = z.object({
-  cursor: z.string().optional(),
-  limit: z.number().min(1).max(100).default(20),
+  is_time_locked: z.boolean().optional(),
 })
 
 const UpdateTaskSchema = z.object({
@@ -28,9 +25,10 @@ const UpdateTaskSchema = z.object({
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   status: z.enum(['not_started', 'in_progress', 'completed', 'missed', 'cancelled']).optional(),
   category: z.string().optional().nullable(),
-  scheduled_at: z.string().datetime({ offset: true }).or(z.date()).optional(),
+  scheduled_at: z.string().datetime({ offset: true }).or(z.date()).nullable().optional(),
   estimated_duration_minutes: z.number().optional(),
   actual_duration_minutes: z.number().optional().nullable(),
+  is_time_locked: z.boolean().optional(),
 })
 
 export const tasksRoutes: FastifyPluginAsync = async (app) => {
@@ -38,28 +36,43 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', { preHandler: [app.authenticate] }, async (req, reply) => {
     const user = req.user!
     
-    const parsed = PaginationSchema.safeParse(req.query)
+    const parsed = TaskListQuerySchema.safeParse(req.query)
     if (!parsed.success) {
       return reply.status(400).send({ success: false, error: parsed.error.issues })
     }
     
-    const { cursor, limit } = parsed.data
+    const { cursor, limit, start_date, end_date } = parsed.data
+    if (start_date && end_date && start_date > end_date) {
+      return reply.status(400).send({ success: false, error: 'start_date must be before or equal to end_date' })
+    }
     
-    // Build query with cursor-based pagination
-    const conditions = [eq(tasks.user_id, user.id)]
+    // Build query with optional date range filters and cursor-based pagination
+    const conditions: any[] = [eq(tasks.user_id, user.id), isNull(tasks.parent_task_id)]
     if (cursor) {
       conditions.push(lt(tasks.scheduled_at, new Date(cursor)))
+    }
+    if (start_date) {
+      conditions.push(gte(tasks.scheduled_at, start_date))
+    }
+    if (end_date) {
+      conditions.push(lte(tasks.scheduled_at, end_date))
     }
     
     const results = await db
       .select()
       .from(tasks)
+      .leftJoin(taskExternalMetadata, eq(tasks.id, taskExternalMetadata.task_id))
       .where(and(...conditions))
       .orderBy(desc(tasks.scheduled_at))
       .limit(limit + 1) // Fetch one extra to determine if there's a next page
     
-    const hasMore = results.length > limit
-    const taskList = hasMore ? results.slice(0, -1) : results
+    const flattenedResults = results.map(row => ({
+      ...row.tasks,
+      external_provider: row.task_external_metadata?.external_provider || null
+    }))
+
+    const hasMore = flattenedResults.length > limit
+    const taskList = hasMore ? flattenedResults.slice(0, -1) : flattenedResults
     const nextCursor = hasMore ? taskList[taskList.length - 1].scheduled_at?.toISOString() : null
     
     return reply.send({
@@ -74,7 +87,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // CREATE TASK
-  app.post('/', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     
     const parsed = CreateTaskSchema.safeParse(req.body)
@@ -100,7 +113,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // UPDATE TASK
-  app.put('/:id', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.put('/:id', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
     
@@ -127,7 +140,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // DELETE TASK
-  app.delete('/:id', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.delete('/:id', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 
@@ -143,7 +156,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // CREATE SUBTASK
-  app.post('/:id/subtasks', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/:id/subtasks', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 
@@ -176,7 +189,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // UPDATE SUBTASK
-  app.put('/:id/subtasks/:subtaskId', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.put('/:id/subtasks/:subtaskId', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id, subtaskId } = req.params as { id: string; subtaskId: string }
 
@@ -195,7 +208,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // DELETE SUBTASK
-  app.delete('/:id/subtasks/:subtaskId', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.delete('/:id/subtasks/:subtaskId', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id, subtaskId } = req.params as { id: string; subtaskId: string }
 
@@ -209,7 +222,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // REORDER SUBTASKS
-  app.post('/:id/subtasks/reorder', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/:id/subtasks/reorder', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
     const { subtaskIds } = req.body as { subtaskIds: string[] }
@@ -228,7 +241,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // COMPLETE ALL SUBTASKS
-  app.post('/:id/subtasks/complete-all', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.post('/:id/subtasks/complete-all', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { createClient } from "@/utils/supabase/server"
+import { shouldRedirectToOnboarding } from "@/lib/onboarding"
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -14,7 +15,7 @@ export async function login(formData: FormData) {
         return { error: "Email and password are required" }
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
     })
@@ -24,7 +25,10 @@ export async function login(formData: FormData) {
     }
 
     revalidatePath("/", "layout")
-    redirect("/dashboard")
+    
+    // Check onboarding status using centralized function
+    const shouldGoToOnboarding = await shouldRedirectToOnboarding()
+    redirect(shouldGoToOnboarding ? "/onboarding" : "/dashboard")
 }
 
 export async function signup(formData: FormData) {
@@ -38,7 +42,7 @@ export async function signup(formData: FormData) {
         return { error: "All fields are required" }
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -52,8 +56,32 @@ export async function signup(formData: FormData) {
         return { error: error.message }
     }
 
+    // Create user record in backend if session exists (auto-confirmed)
+    if (data.session && data.user) {
+        try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/users/webhook`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    event: 'user.signed_up',
+                    type: 'auth',
+                    record: {
+                        id: data.user.id,
+                        email: data.user.email,
+                        created_at: data.user.created_at,
+                        user_metadata: data.user.user_metadata,
+                    },
+                }),
+            })
+        } catch (err) {
+            console.error('Failed to create user record:', err)
+        }
+    }
+
     revalidatePath("/", "layout")
-    redirect("/onboarding")
+    return { success: true }
 }
 
 export async function signout() {

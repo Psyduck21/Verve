@@ -30,8 +30,8 @@ function injectFocalButton() {
       const subject = subjectEl ? subjectEl.textContent || 'Untitled Email' : 'Untitled Email'
       
       const bodies = document.querySelectorAll('.a3s')
-      const latestBody = bodies.length > 0 ? bodies[bodies.length - 1].textContent || '' : ''
-      const raw_content = latestBody.substring(0, 5000)
+      const latestBody = bodies.length > 0 ? (bodies[bodies.length - 1] as HTMLElement).innerText || '' : ''
+      const raw_content = `Subject: ${subject}\n\n${latestBody}`.replace(/\s+/g, ' ').substring(0, 5000)
 
       const urlMatches = window.location.hash.match(/\/([A-Za-z0-9]+)$/)
       const externalId = urlMatches ? urlMatches[1] : window.location.href
@@ -41,7 +41,7 @@ function injectFocalButton() {
 
       chrome.runtime.sendMessage({ 
         type: 'EXTRACT_EMAIL_INTENT', 
-        payload: { raw_content, current_date_time: new Date().toISOString() } 
+        payload: { raw_content, current_date_time: new Date().toString() } 
       }, (aiResponse) => {
         let aiData = {}
         if (!aiResponse?.success) {
@@ -75,6 +75,30 @@ function injectFocalButton() {
       formContainer.style.gap = '8px'
       formContainer.style.width = '300px'
 
+      const headerRow = document.createElement('div')
+      headerRow.style.display = 'flex'
+      headerRow.style.justifyContent = 'space-between'
+      headerRow.style.alignItems = 'center'
+      headerRow.style.marginBottom = '4px'
+
+      const formLabel = document.createElement('strong')
+      formLabel.innerText = 'Save to Focal'
+
+      const closeBtn = document.createElement('button')
+      closeBtn.type = 'button'
+      closeBtn.innerText = '✕'
+      closeBtn.setAttribute('aria-label', 'Close confirmation form')
+      closeBtn.style.background = 'transparent'
+      closeBtn.style.border = 'none'
+      closeBtn.style.color = '#fff'
+      closeBtn.style.cursor = 'pointer'
+      closeBtn.style.fontSize = '16px'
+      closeBtn.addEventListener('click', () => formContainer.remove())
+
+      headerRow.appendChild(formLabel)
+      headerRow.appendChild(closeBtn)
+      formContainer.appendChild(headerRow)
+
       const createInput = (val: string, type: string = 'text', placeholder: string = '') => {
         const inp = document.createElement('input')
         inp.type = type
@@ -98,10 +122,49 @@ function injectFocalButton() {
         }
       }
 
-      const titleInput = createInput(aiData?.title || `Reply: ${subject}`)
+      const fallbackTitle = aiData?.title || `Reply: ${subject}`
+      const fallbackDescription = aiData?.description || raw_content.slice(0, 1000) || 'Email task'
+      const fallbackPriority = aiData?.priority || 'medium'
+      const fallbackCategory = aiData?.category || 'personal'
+      const fallbackDuration = typeof aiData?.estimated_duration_minutes === 'number'
+        ? aiData.estimated_duration_minutes.toString()
+        : '30'
+
+      const titleInput = createInput(fallbackTitle)
+      
+      const descriptionInput = document.createElement('textarea')
+      descriptionInput.value = fallbackDescription
+      descriptionInput.rows = 2
+      descriptionInput.style.padding = '8px'
+      descriptionInput.style.borderRadius = '4px'
+      descriptionInput.style.border = '1px solid #3f3f46'
+      descriptionInput.style.backgroundColor = '#27272a'
+      descriptionInput.style.color = '#fff'
+      descriptionInput.style.resize = 'vertical'
+
       const dateInput = createInput(parsedDate, 'date')
       const timeInput = createInput(parsedTime, 'time')
-      const durationInput = createInput(aiData?.estimated_duration_minutes?.toString() || '30', 'number')
+      const durationInput = createInput(fallbackDuration, 'number')
+
+      const createSelect = (options: string[], selectedValue: string) => {
+        const sel = document.createElement('select')
+        sel.style.padding = '8px'
+        sel.style.borderRadius = '4px'
+        sel.style.border = '1px solid #3f3f46'
+        sel.style.backgroundColor = '#27272a'
+        sel.style.color = '#fff'
+        options.forEach(opt => {
+          const optionEl = document.createElement('option')
+          optionEl.value = opt
+          optionEl.innerText = opt.charAt(0).toUpperCase() + opt.slice(1)
+          if (opt === selectedValue) optionEl.selected = true
+          sel.appendChild(optionEl)
+        })
+        return sel
+      }
+
+      const priorityInput = createSelect(['critical', 'high', 'medium', 'low'], fallbackPriority)
+      const categoryInput = createSelect(['work', 'personal', 'health'], fallbackCategory)
 
       const submitBtn = document.createElement('button')
       submitBtn.innerText = 'Confirm Save'
@@ -115,6 +178,12 @@ function injectFocalButton() {
 
       formContainer.appendChild(document.createTextNode('Task Title'))
       formContainer.appendChild(titleInput)
+      formContainer.appendChild(document.createTextNode('Summary'))
+      formContainer.appendChild(descriptionInput)
+      formContainer.appendChild(document.createTextNode('Priority'))
+      formContainer.appendChild(priorityInput)
+      formContainer.appendChild(document.createTextNode('Category'))
+      formContainer.appendChild(categoryInput)
       formContainer.appendChild(document.createTextNode('Date'))
       formContainer.appendChild(dateInput)
       formContainer.appendChild(document.createTextNode('Time'))
@@ -128,27 +197,19 @@ function injectFocalButton() {
       toolbar.appendChild(formContainer)
 
       submitBtn.addEventListener('click', () => {
-        if (!dateInput.value || !timeInput.value) {
-           submitBtn.innerText = 'Please pick a date & time!'
-           submitBtn.style.backgroundColor = '#eab308'
-           setTimeout(() => {
-             submitBtn.innerText = 'Confirm Save'
-             submitBtn.style.backgroundColor = '#10B981'
-           }, 2000)
-           return
-        }
+        // Unscheduled emails are allowed, so we removed the strict date/time validation.
 
         const payload = {
           title: titleInput.value,
-          description: aiData?.description,
-          priority: aiData?.priority,
-          category: aiData?.category,
+          description: descriptionInput.value,
+          priority: priorityInput.value,
+          category: categoryInput.value,
           external_provider: 'gmail',
           external_id: externalId,
           external_link: window.location.href,
           source_metadata: { original_subject: subject },
           raw_content: raw_content,
-          scheduled_at: (dateInput.value && timeInput.value) ? new Date(`${dateInput.value}T${timeInput.value}:00`).toISOString() : undefined,
+          scheduled_at: dateInput.value ? new Date(`${dateInput.value}T${timeInput.value || '09:00'}:00`).toISOString() : undefined,
           estimated_duration_minutes: parseInt(durationInput.value) || 30
         }
 

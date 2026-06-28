@@ -15,9 +15,11 @@ import {
 import { Icon } from "@/components/ui/Icon"
 import { cn } from "@/lib/utils"
 import { EditTaskModal } from "@/components/tasks/EditTaskModal"
+import { useEvents } from "@/hooks/useEvents"
+import { useListNavigation } from "@/hooks/useListNavigation"
+import { useTasks, useUpdateTask, useDeleteTask } from "@/hooks/useTasks"
+import { useTaskStore } from "@/store/useTaskStore"
 import { apiClient } from "@/utils/apiClient"
-import { useTasks } from "@/hooks/useTasks"
-import { NewTaskSheet } from "@/components/tasks/NewTaskSheet"
 
 const STATS_ICONS = {
     tasksCompleted: { icon: CheckCircle2, colorClass: "text-green-500", gradientClass: "gradient-green" },
@@ -25,34 +27,48 @@ const STATS_ICONS = {
     meetings: { icon: CalendarIcon, colorClass: "text-purple-500", gradientClass: "gradient-purple" }
 }
 
-// Removed mock INBOX_ITEMS
-const AI_SUGGESTIONS = [
-    { id: "s1", text: "You have 2 hours free. Move 'Write docs' here?", action: "Reschedule" },
-    { id: "s2", text: "3 tasks overdue. Batch them into a focus block?", action: "Batch Tasks" },
-]
-
 export function DashboardContent({ user }: { user?: any }) {
-    const [suggestions, setSuggestions] = useState(AI_SUGGESTIONS)
+    const [suggestions, setSuggestions] = useState<any[]>([])
+    const [dismissedConflictIds, setDismissedConflictIds] = useState<string[]>([])
     const [loadingId, setLoadingId] = useState<string | null>(null)
     const [stats, setStats] = useState<any>(null)
     const [isLoadingStats, setIsLoadingStats] = useState(true)
-    const [isNewTaskOpen, setIsNewTaskOpen] = useState(false)
+    const [summaryError, setSummaryError] = useState<string | null>(null)
+    const { openModal } = useTaskStore()
+    const isNewTaskOpen = useTaskStore(state => state.isTaskModalOpen)
     const [editTask, setEditTask] = useState<any | null>(null)
-    const [focusedIndex, setFocusedIndex] = useState(-1)
+    
+    const { mutate: updateTask } = useUpdateTask()
+    const { mutate: deleteTask } = useDeleteTask()
     const [todaysTasks, setTodaysTasks] = useState<any[]>([])
 
-    useEffect(() => {
-        const today = new Date().toISOString().split('T')[0]
-        apiClient.dashboard.getSummary().then(res => {
+    const loadSummary = async () => {
+        try {
+            const res = await apiClient.dashboard.getSummary()
             if (res.success) {
                 setStats(res.data.stats)
-                setTodaysTasks(res.data.tasks || [])
+                setTodaysTasks(
+                    [...(res.data.tasks || [])].sort((a, b) => {
+                        return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
+                    })
+                )
+                setSummaryError(null)
             }
+        } catch {
+            setSummaryError("Dashboard summary is unavailable right now.")
+        } finally {
             setIsLoadingStats(false)
-        }).catch(() => {
-            setIsLoadingStats(false)
-        })
+        }
+    }
+
+    useEffect(() => {
+        loadSummary()
     }, [])
+
+    const handleTaskCreated = async () => {
+        setIsLoadingStats(true)
+        await loadSummary()
+    }
 
     const conflicts = useMemo(() => {
         const overlaps = []
@@ -68,41 +84,35 @@ export function DashboardContent({ user }: { user?: any }) {
         return overlaps
     }, [todaysTasks])
 
+    const conflictSuggestions = useMemo(() => {
+        return conflicts.map((conflict) => ({
+            id: `conflict-${conflict.task1.id}-${conflict.task2.id}`,
+            text: `Resolve conflict between "${conflict.task1.title}" and "${conflict.task2.title}"`,
+            action: "Resolve",
+            isConflict: true,
+        }))
+    }, [conflicts])
+
+    const visibleSuggestions = useMemo(() => {
+        return [...conflictSuggestions, ...suggestions].filter((item) => !dismissedConflictIds.includes(item.id))
+    }, [conflictSuggestions, suggestions, dismissedConflictIds])
+
     const firstName = user?.user_metadata?.full_name?.split(' ')[0] || "there"
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (editTask || isNewTaskOpen) return;
-            if (todaysTasks.length === 0) return;
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                setFocusedIndex(prev => (prev < todaysTasks.length - 1 ? prev + 1 : prev))
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                setFocusedIndex(prev => (prev > 0 ? prev - 1 : prev))
-            } else if ((e.key === 'Enter' || e.key === 'e') && focusedIndex >= 0) {
-                e.preventDefault()
-                setEditTask(todaysTasks[focusedIndex])
-            }
-        }
-
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [todaysTasks, focusedIndex, editTask, isNewTaskOpen])
-
-    useEffect(() => {
-        apiClient.dashboard.getSummary().then(res => {
-            if (res.success) {
-                setStats(res.data.stats)
-            }
-            setIsLoadingStats(false)
-        }).catch(() => {
-            setIsLoadingStats(false)
-        })
-    }, [])
+    const { focusedIndex, setFocusedIndex } = useListNavigation({
+        itemCount: todaysTasks.length,
+        disabled: !!editTask || isNewTaskOpen,
+        onSelect: (index) => setEditTask(todaysTasks[index]),
+        onUnschedule: (index) => updateTask({ id: todaysTasks[index].id, scheduled_at: null }),
+        onDelete: (index) => deleteTask(todaysTasks[index].id),
+        initialIndex: -1,
+    })
 
     const dismissSuggestion = (id: string) => {
+        if (id.startsWith('conflict-')) {
+            setDismissedConflictIds(prev => [...prev, id])
+            return
+        }
         setSuggestions(prev => prev.filter(s => s.id !== id))
     }
 
@@ -110,10 +120,7 @@ export function DashboardContent({ user }: { user?: any }) {
         setLoadingId(id)
         try {
             // Trigger Fastify AI engine to process the suggestion context
-            const res = await apiClient.ai.rescheduleTasks(
-                todaysTasks.map((t: any) => t.id),
-                JSON.stringify({ command: text, tasks: todaysTasks })
-            )
+            const res = await apiClient.ai.rescheduleTasks(text, todaysTasks)
             if (res.success) {
                 dismissSuggestion(id)
             }
@@ -132,7 +139,8 @@ export function DashboardContent({ user }: { user?: any }) {
 
     return (
         <div className="flex flex-col h-full w-full bg-transparent" data-purpose="dashboard-page">
-            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col overflow-hidden">
+            <div className="flex flex-1 overflow-hidden">
+                <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-thin">
                     {/* ── Stats Row ── */}
                     <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -169,26 +177,6 @@ export function DashboardContent({ user }: { user?: any }) {
                         {/* ── Main Column: Today's Plan & Conflicts ── */}
                         <div className="space-y-6">
 
-                            {/* Task Conflicts Alert */}
-                            {conflicts.length > 0 && (
-                                <div className="p-5 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive">
-                                    <h3 className="font-bold flex items-center gap-2 mb-2">
-                                        <Icon icon={Sparkles} size="sm" />
-                                        Schedule Conflicts Detected
-                                    </h3>
-                                    <div className="space-y-2">
-                                        {conflicts.map((c, i) => (
-                                            <div key={i} className="text-sm font-medium">
-                                                "{c.task1.title}" overlaps with "{c.task2.title}"
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <button className="mt-4 px-3 py-1.5 text-xs font-bold bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors">
-                                        Resolve with AI
-                                    </button>
-                                </div>
-                            )}
-
                             {/* Today's Plan */}
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
@@ -199,7 +187,15 @@ export function DashboardContent({ user }: { user?: any }) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    {todaysTasks.length === 0 ? (
+                                    {summaryError ? (
+                                        <div className="p-8 text-center text-destructive font-medium border border-dashed border-destructive/30 bg-destructive/10 rounded-2xl">
+                                            {summaryError}
+                                        </div>
+                                    ) : isLoadingStats ? (
+                                        <div className="p-8 text-center text-muted-foreground font-medium border border-dashed border-border bg-card rounded-2xl">
+                                            Loading today's plan...
+                                        </div>
+                                    ) : todaysTasks.length === 0 ? (
                                         <div className="p-8 text-center text-muted-foreground font-medium border border-dashed border-border bg-card rounded-2xl">
                                             No tasks scheduled for today.
                                         </div>
@@ -240,14 +236,14 @@ export function DashboardContent({ user }: { user?: any }) {
                             </h2>
 
                             <div className="space-y-3">
-                                {suggestions.length === 0 ? (
+                                {visibleSuggestions.length === 0 ? (
                                     <div
                                         className="p-6 text-center border border-dashed border-border bg-card rounded-2xl text-sm font-medium text-muted-foreground"
                                     >
                                         You're all caught up!
                                     </div>
                                 ) : (
-                                    suggestions.map((s, i) => (
+                                    visibleSuggestions.map((s, i) => (
                                         <div
                                             key={s.id}
                                             className="p-5 rounded-2xl bg-card border border-border shadow-sm relative overflow-hidden"
@@ -279,6 +275,7 @@ export function DashboardContent({ user }: { user?: any }) {
 
                 </div>
             </div>
+            </div>
             
             <EditTaskModal
                 open={!!editTask}
@@ -286,10 +283,6 @@ export function DashboardContent({ user }: { user?: any }) {
                 task={editTask}
             />
 
-            <NewTaskSheet
-                isOpen={isNewTaskOpen}
-                onClose={() => setIsNewTaskOpen(false)}
-            />
         </div>
     )
 }

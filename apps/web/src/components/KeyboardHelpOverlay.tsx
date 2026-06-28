@@ -2,32 +2,26 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Command, CornerDownLeft, ArrowUp, ArrowDown, Slash } from "lucide-react"
-import { KEYBINDINGS } from "@/config/keybindings"
+import { X, Command, CornerDownLeft } from "lucide-react"
 
 export function KeyboardHelpOverlay() {
     const [isOpen, setIsOpen] = useState(false)
 
     useEffect(() => {
+        const handleToggle = () => setIsOpen(prev => !prev)
+
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-                // Check if not in an input field
-                if (
-                    document.activeElement?.tagName !== "INPUT" &&
-                    document.activeElement?.tagName !== "TEXTAREA" &&
-                    !(document.activeElement as HTMLElement)?.isContentEditable
-                ) {
-                    e.preventDefault()
-                    setIsOpen(prev => !prev)
-                }
-            }
             if (e.key === 'Escape' && isOpen) {
                 setIsOpen(false)
             }
         }
 
+        window.addEventListener('toggle_keyboard_help', handleToggle)
         window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
+        return () => {
+            window.removeEventListener('toggle_keyboard_help', handleToggle)
+            window.removeEventListener('keydown', handleKeyDown)
+        }
     }, [isOpen])
 
     const shortcutGroups = [
@@ -40,6 +34,7 @@ export function KeyboardHelpOverlay() {
                 { keys: ["G", "C"], description: "Go to calendar" },
                 { keys: ["G", "T"], description: "Go to tasks" },
                 { keys: ["G", "L"], description: "Go to templates" },
+                { keys: ["G", "I"], description: "Go to inbox" },
                 { keys: ["G", "S"], description: "Go to settings" },
                 { keys: ["?"], description: "Show this help" },
             ]
@@ -47,27 +42,35 @@ export function KeyboardHelpOverlay() {
         {
             title: "Task Navigation",
             shortcuts: [
-                { keys: ["↑", "↓"], description: "Navigate tasks" },
-                { keys: ["Enter"], description: "Edit selected task" },
-                { keys: ["E"], description: "Edit selected task" },
-                { keys: ["Shift", "Space"], description: "Bulk select" },
+                { keys: ["↑", "↓", "K", "J"], description: "Navigate tasks" },
+                { keys: ["Shift", "↑", "↓"], description: "Extend selection" },
+                { keys: ["Space"], description: "Toggle task completion" },
+                { keys: ["Shift", "Space"], description: "Bulk select focused task" },
+                { keys: ["Esc"], description: "Deselect tasks" },
+                { keys: ["Enter", "E"], description: "Edit selected task" },
                 { keys: ["1-4"], description: "Set priority" },
+                { keys: ["Shift", "1-3"], description: "Move to To Do/Overdue/Doing" },
+                { keys: ["U"], description: "Unschedule task" },
                 { keys: ["D"], description: "Delete task" },
-                { keys: [">"], description: "Expand subtasks" },
-                { keys: ["<"], description: "Collapse subtasks" },
+                { keys: [">", "<"], description: "Expand/Collapse subtasks" },
                 { keys: ["S"], description: "Add subtask" },
+                { keys: ["L"], description: "Lock selected task" },
+            ]
+        },
+        {
+            title: "Calendar View",
+            shortcuts: [
+                { keys: ["Alt", "1-3"], description: "View Day/Week/Month" },
+                { keys: ["Alt", "W"], description: "Toggle right panel" },
+                { keys: ["U"], description: "Unschedule selected event" },
+                { keys: ["Enter"], description: "Edit selected event" },
+                { keys: ["Esc"], description: "Deselect event" },
             ]
         },
         {
             title: "Time Blocking",
             shortcuts: [
                 { keys: ["T", "B"], description: "Create time block" },
-                { keys: ["Shift+H"], description: "Navigate left" },
-                { keys: ["Shift+L"], description: "Navigate right" },
-                { keys: ["["], description: "Resize start" },
-                { keys: ["]"], description: "Resize end" },
-                { keys: ["D"], description: "Delete block" },
-                { keys: ["C"], description: "Convert to task" },
             ]
         },
         {
@@ -81,8 +84,8 @@ export function KeyboardHelpOverlay() {
         {
             title: "Modal Shortcuts",
             shortcuts: [
-                { keys: ["↑", "↓"], description: "Navigate fields" },
-                { keys: ["Enter"], description: "Edit field / Save" },
+                { keys: ["↑", "↓", "Ctrl+K", "Ctrl+J"], description: "Navigate fields" },
+                { keys: ["Enter"], description: "Select Option / Edit" },
                 { keys: ["Esc"], description: "Close modal" },
                 { keys: ["⌘", "Enter"], description: "Save changes" },
             ]
@@ -93,7 +96,9 @@ export function KeyboardHelpOverlay() {
                 { keys: ["!", "priority"], description: "Set priority" },
                 { keys: ["#", "category"], description: "Set category" },
                 { keys: ["~", "duration"], description: "Set duration" },
+                { keys: ["-r", "routine"], description: "Assign to routine" },
                 { keys: ["//", "desc"], description: "Add description" },
+                { keys: ["-l", "-lock"], description: "Mark task as time locked" },
             ]
         }
     ]
@@ -150,19 +155,19 @@ export function KeyboardHelpOverlay() {
                                                 {group.title}
                                             </h3>
                                             <div className="space-y-2">
-                                                {group.shortcuts.map((shortcut) => (
+                                                {group.shortcuts.map((shortcut, idx) => (
                                                     <div
-                                                        key={shortcut.description}
+                                                        key={`${group.title}-${shortcut.description}-${idx}`}
                                                         className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 border border-border/50"
                                                     >
                                                         <span className="text-sm text-muted-foreground">{shortcut.description}</span>
                                                         <div className="flex items-center gap-1">
-                                                            {shortcut.keys.map((key, idx) => (
-                                                                <div key={idx} className="flex items-center gap-1">
+                                                            {shortcut.keys.map((key, keyIdx) => (
+                                                                <div key={keyIdx} className="flex items-center gap-1">
                                                                     <kbd className="px-2 py-1 text-xs font-semibold text-foreground bg-background border border-border rounded shadow-sm">
                                                                         {key}
                                                                     </kbd>
-                                                                    {idx < shortcut.keys.length - 1 && (
+                                                                    {keyIdx < shortcut.keys.length - 1 && (
                                                                         <CornerDownLeft size={12} className="text-muted-foreground/50" />
                                                                     )}
                                                                 </div>

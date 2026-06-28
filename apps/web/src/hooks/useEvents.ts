@@ -1,6 +1,5 @@
 "use client"
-import { useTasks, type Task } from "./useTasks"
-import { parse } from "date-fns"
+import { useTasks, type Task, type TaskQueryParams } from "./useTasks"
 
 export type CalendarEvent = {
     id: string
@@ -11,13 +10,13 @@ export type CalendarEvent = {
     task: Task
 }
 
-export function useEvents() {
-    const { data: tasks, isLoading, error } = useTasks()
+export function useEvents(params?: TaskQueryParams) {
+    const { data: tasks, isLoading, error } = useTasks(params)
 
     const events: CalendarEvent[] = (tasks ?? [])
         .filter((task) => task.scheduled_at)
         .map((task) => {
-            const start = new Date(task.scheduled_at)
+            const start = new Date(task.scheduled_at!)
             
             // Calculate end time
             const duration = task.actual_duration_minutes ?? task.estimated_duration_minutes ?? 30
