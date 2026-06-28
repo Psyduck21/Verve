@@ -1,6 +1,0 @@
-[build]
-builder = "nixpacks"
-buildCommand = "pnpm --filter=@verve/backend... build"
-
-[deploy]
-startCommand = "pnpm --filter=@verve/backend start"
