@@ -145,8 +145,8 @@ async function bootstrap() {
     // ── CSRF token endpoint (no auth) ─────────────────────────
     // Provides a one-time CSRF token for clients to include in mutation requests
     app.get('/v1/csrf-token', async (request, reply) => {
-      // The @fastify/csrf-protection plugin exposes `request.csrfToken()`
-      const token = (request as any).csrfToken?.()
+      // The @fastify/csrf-protection plugin exposes `reply.generateCsrf()`
+      const token = await reply.generateCsrf()
       return reply.send({ success: true, csrfToken: token })
     })
 
