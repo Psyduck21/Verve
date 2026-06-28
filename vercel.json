@@ -1,6 +1,5 @@
 {
   "buildCommand": "pnpm build",
-  "outputDirectory": "apps/web/.next",
-  "framework": "nextjs",
-  "ignoreCommand": "npx ignore-step --project @verve/web"
+  "outputDirectory": ".next",
+  "framework": "nextjs"
 }
