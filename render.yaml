@@ -1,7 +1,7 @@
 services:
   - type: web
     name: verve-backend
-    env: node
+    runtime: node
     plan: free
     region: ohio
     buildCommand: npm install -g pnpm && pnpm install && pnpm --filter=@verve/backend build

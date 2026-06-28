@@ -19,7 +19,15 @@ export function isHotkey(e: React.KeyboardEvent | KeyboardEvent, hotkeys: string
         if (requireMeta !== e.metaKey) return false;
         if (requireCtrl !== e.ctrlKey) return false;
         if (requireAlt !== e.altKey) return false;
-        if (requireShift !== e.shiftKey) return false;
+        
+        if (requireShift !== e.shiftKey) {
+            // Exception: if the hotkey definition doesn't explicitly require Shift,
+            // but the user pressed Shift to produce the exact character (e.g., '?'), allow it.
+            const isShiftCharacter = !requireShift && e.shiftKey && e.key === expectedKey && expectedKey.length === 1;
+            if (!isShiftCharacter) {
+                return false;
+            }
+        }
 
         // Space can also be written as 'Space' in composite hotkeys (e.g. 'Shift+Space')
         if (expectedKey.toLowerCase() === 'space' && (e.key === ' ' || e.key === 'Spacebar' || e.code === 'Space')) return true;

@@ -102,10 +102,12 @@ function OnboardingContent() {
                     </div>
                     {currentStep > 1 && currentStep < TOTAL_STEPS && (
                         <button
+                            type="button"
                             onClick={prevStep}
                             disabled={isLoading}
                             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
+                            <ChevronLeft className="h-3 w-3" />
                             Back
                         </button>
                     )}
