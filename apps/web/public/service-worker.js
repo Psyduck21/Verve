@@ -1,4 +1,4 @@
-const CACHE_NAME = 'focal-offline-v1';
+const CACHE_NAME = 'verve-offline-v1';
 const OFFLINE_URL = '/';
 
 self.addEventListener('install', (event) => {

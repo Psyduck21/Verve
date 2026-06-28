@@ -69,5 +69,5 @@ ios/
 *.sqlite
 *.db
 
-
+.agents/
 docs/

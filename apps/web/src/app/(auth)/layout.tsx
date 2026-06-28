@@ -1,6 +1,7 @@
 "use client"
 
 import { Icon } from "@/components/ui/Icon"
+import { VerveLogo } from "@/components/ui/VerveLogo"
 import { Calendar, CheckCircle2, HelpCircle, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -36,8 +37,8 @@ export default function AuthLayout({
             <header className="absolute top-0 left-0 right-0 w-full z-50">
                 <div className="flex items-center justify-between px-8 py-6 w-full max-w-[1600px] mx-auto">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
-                            <Icon icon={Calendar} size="sm" />
+                        <div className="w-8 h-8 rounded-lg bg-foreground/5 shadow-sm border border-border flex items-center justify-center">
+                            <VerveLogo className="w-5 h-5" />
                         </div>
                         <h1 className="font-bold text-foreground text-xl tracking-tight">Verve</h1>
                     </div>
@@ -54,14 +55,10 @@ export default function AuthLayout({
 
             <main className="flex-1 flex w-full">
                 {/* Left Side: Static Branding — persists across signup + all onboarding steps */}
-                <div className="hidden lg:flex lg:w-1/2 bg-muted flex-col justify-center items-center p-12 relative overflow-hidden">
+                <div className="hidden lg:flex lg:w-1/2 bg-muted flex-col justify-center items-center p-12 relative overflow-hidden sticky top-0 h-screen">
                     <div className="max-w-md z-10 pt-16">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-8 shadow-xl shadow-primary/20">
-                            {isOnboarding ? (
-                                <Icon icon={Sparkles} size="md" className="w-8 h-8" />
-                            ) : (
-                                <Icon icon={Calendar} size="md" className="w-8 h-8" />
-                            )}
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-foreground/5 border border-border mb-8 shadow-xl">
+                            <VerveLogo className="w-10 h-10" />
                         </div>
                         <h2 className="text-4xl lg:text-5xl font-extrabold text-foreground tracking-tight mb-6 leading-[1.1]">
                             {isOnboarding

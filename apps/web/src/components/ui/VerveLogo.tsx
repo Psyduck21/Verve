@@ -15,9 +15,9 @@ export function VerveLogo({ className, ...props }: VerveLogoProps) {
             {...props}
         >
             <path 
-                d="M20 45 L45 80 L85 20" 
+                d="M12.5 20 L57.5 80 L87.5 40 M35 20 L57.5 50 L72.5 30" 
                 stroke="url(#verve-gradient)" 
-                strokeWidth="16" 
+                strokeWidth="12" 
                 strokeLinecap="round" 
                 strokeLinejoin="round"
             />

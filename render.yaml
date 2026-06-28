@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: verve-backend
+    runtime: node
+    plan: free
+    region: ohio
+    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter=@verve/backend build
+    startCommand: pnpm --filter=@verve/backend start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

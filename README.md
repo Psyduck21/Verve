@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/web/public/logo.png" alt="Verve Logo" width="120" />
+  <img src="apps/web/public/logo.svg" alt="Verve Logo" width="120" />
   <h1>Verve</h1>
   <p><strong>The intelligent operating system for your professional time.</strong></p>
 </div>

@@ -15,8 +15,8 @@ export const metadata: Metadata = {
     description:
         "Verve is an AI-powered calendar scheduler that automatically reschedules meetings, resolves conflicts, and keeps you in your flow state.",
     icons: {
-        icon: "/logo.png",
-        shortcut: "/logo.png",
+        icon: "/logo.svg",
+        shortcut: "/logo.svg",
     },
 }
 
