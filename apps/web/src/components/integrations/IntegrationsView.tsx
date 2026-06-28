@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Mail, Calendar as CalendarIcon, Video, CreditCard, Github, Slack, CheckCircle2 } from "lucide-react"
+import { Mail, Calendar as CalendarIcon, Video, CreditCard, GitBranch, MessageSquare, CheckCircle2 } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import { cn } from "@/lib/utils"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -14,8 +14,8 @@ const INTEGRATIONS = [
     { id: "microsoft",  name: "Microsoft 365",     description: "Sync Outlook and Teams",           icon: CalendarIcon, color: "text-blue-500",   requiresExtension: false },
     { id: "zoom",       name: "Zoom",              description: "Auto-generate meeting links",      icon: Video,        color: "text-blue-400",   requiresExtension: true },
     { id: "stripe",     name: "Stripe",            description: "Track invoices in Unified Inbox",  icon: CreditCard,   color: "text-indigo-500", requiresExtension: true },
-    { id: "github",     name: "GitHub",            description: "Link PRs to tasks",                icon: Github,       color: "text-foreground", requiresExtension: true },
-    { id: "slack",      name: "Slack",             description: "Send notifications to channels",   icon: Slack,        color: "text-pink-500",   requiresExtension: true },
+    { id: "github",     name: "GitHub",            description: "Link PRs to tasks",                icon: GitBranch,    color: "text-foreground", requiresExtension: true },
+    { id: "slack",      name: "Slack",             description: "Send notifications to channels",   icon: MessageSquare,color: "text-pink-500",   requiresExtension: true },
 ]
 
 import { useIntegrations, useConnectIntegration, useDisconnectIntegration } from "@/hooks/useIntegrations"
