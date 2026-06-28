@@ -106,9 +106,9 @@ function OnboardingWelcome() {
                     Tell us about your schedule so we can set up your perfect workflow.
                 </p>
                 <div className="mt-12">
-                    <motion.div 
+                    <motion.div
                         initial={{ scale: 1 }}
-                        animate={{ scale: [1, 0.95, 1], backgroundColor: ["#8b5cf6", "#7c3aed", "#8b5cf6"] }}
+                        animate={{ scale: [1, 0.95, 1] }}
                         transition={{ delay: 2.5, duration: 0.5 }}
                         className="h-12 px-8 bg-primary rounded-xl flex items-center justify-center text-primary-foreground font-bold shadow-lg shadow-primary/25 cursor-pointer hover:bg-primary/90 transition-colors"
                     >
@@ -223,8 +223,8 @@ function GmailIntegration() {
                         </div>
                         
                         {/* Verve Extension Button */}
-                        <motion.div 
-                            animate={saved ? { backgroundColor: "rgba(139,92,246,0.2)", borderColor: "rgba(139,92,246,0.5)" } : { scale: [1, 0.95, 1] }}
+                        <motion.div
+                            animate={saved ? { scale: 1 } : { scale: [1, 0.95, 1] }}
                             transition={{ scale: { delay: 1.5, duration: 0.5 } }}
                             className="ml-auto border border-primary/40 bg-primary/10 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 text-primary transition-colors relative overflow-hidden"
                         >
@@ -477,9 +477,9 @@ function MainApp({ layoutStep }: { layoutStep: number }) {
                                     transition={{ delay: 2.5, duration: 0.5 }}
                                     className="p-4 bg-card/40 backdrop-blur-sm border border-border/60 rounded-xl shadow-sm flex items-center gap-4 overflow-hidden"
                                 >
-                                    <motion.div 
-                                        initial={{ backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.2)" }}
-                                        animate={{ backgroundColor: "#10b981", borderColor: "#10b981" }}
+                                    <motion.div
+                                        initial={{ borderColor: "rgba(255,255,255,0.2)" }}
+                                        animate={{ borderColor: "#10b981" }}
                                         transition={{ delay: 1.5, duration: 0.2 }}
                                         className="h-5 w-5 rounded-md border-2 flex items-center justify-center text-white"
                                     >

@@ -109,7 +109,7 @@ export function Hero() {
 
               <Link href="/login" passHref>
                 <motion.button
-                  whileHover={{ scale: 1.02, y: -2, backgroundColor: "hsl(var(--muted))" }}
+                  whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 bg-background/50 backdrop-blur-xl text-foreground border border-border/50 shadow-lg rounded-2xl font-bold text-lg transition-all"
                 >
