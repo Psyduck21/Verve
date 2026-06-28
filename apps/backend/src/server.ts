@@ -79,7 +79,8 @@ Sentry.init({
   tracesSampleRate: 1.0,
 })
 
-const PORT = parseInt(process.env.API_PORT ?? '3001', 10)
+// The port must fallback to process.env.PORT for Render deployment compatibility
+const PORT = parseInt(process.env.PORT || process.env.API_PORT || '3001', 10)
 
 async function bootstrap() {
   const app = Fastify({

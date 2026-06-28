@@ -5,8 +5,8 @@ import { FastifyInstance } from 'fastify'
 
 export const corsPlugin = fp(async (app: FastifyInstance) => {
   // Whitelist specific chrome extension IDs
-  const allowedExtensionIds = process.env.ALLOWED_EXTENSION_IDS 
-    ? process.env.ALLOWED_EXTENSION_IDS.split(',') 
+  const allowedExtensionIds = process.env.ALLOWED_EXTENSION_IDS
+    ? process.env.ALLOWED_EXTENSION_IDS.split(',')
     : []
 
   await app.register(cors, {
@@ -17,12 +17,16 @@ export const corsPlugin = fp(async (app: FastifyInstance) => {
         'https://www.verve.app',
         'https://mail.google.com',
       ]
-      
+
+      if (process.env.FRONTEND_URL) {
+        allowedOrigins.push(process.env.FRONTEND_URL)
+      }
+
       // Only add localhost if explicitly in development mode (not just "not production")
       if (process.env.NODE_ENV === 'development') {
         allowedOrigins.push('http://localhost:3000', 'http://localhost:3001')
       }
-      
+
       // Check if origin is a chrome extension. Allow in development or if explicitly whitelisted.
       const isChromeExtension = origin && origin.startsWith('chrome-extension://')
       const isExtensionAllowed = isChromeExtension && (
@@ -36,10 +40,10 @@ export const corsPlugin = fp(async (app: FastifyInstance) => {
         cb(new Error(`CORS: Origin not allowed: ${origin}`), false)
       }
     },
-    credentials:     true,  // Required for cookies
-    methods:         ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders:  ['Content-Type', 'X-CSRF-Token', 'X-Request-ID', 'Authorization'],
-    exposedHeaders:  ['X-Request-ID'],
-    maxAge:          86400,
+    credentials: true,  // Required for cookies
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-ID', 'Authorization'],
+    exposedHeaders: ['X-Request-ID'],
+    maxAge: 86400,
   })
 })
