@@ -10,7 +10,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
