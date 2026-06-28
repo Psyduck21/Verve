@@ -164,7 +164,7 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
         if (onSelectedDateChange) {
             onSelectedDateChange(date)
         }
-    }, [date, onSelectedDateChange])
+    }, [date])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
