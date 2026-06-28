@@ -5,15 +5,27 @@ export interface OnboardingStatus {
   step?: number
 }
 
+// Simple in-memory cache for onboarding status (per request lifecycle)
+let cachedStatus: OnboardingStatus | null = null
+let cacheTimestamp: number = 0
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 /**
  * Centralized function to check onboarding status from the backend
  * @returns Onboarding status or null if check fails
  */
 export async function checkOnboardingStatus(): Promise<OnboardingStatus | null> {
+  const now = Date.now()
+
+  // Return cached status if still valid
+  if (cachedStatus && (now - cacheTimestamp) < CACHE_TTL) {
+    return cachedStatus
+  }
+
   try {
     const supabase = await createClient()
     const { data: { session } } = await supabase.auth.getSession()
-    
+
     if (!session) {
       return null
     }
@@ -22,14 +34,22 @@ export async function checkOnboardingStatus(): Promise<OnboardingStatus | null> 
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
       },
+      // Add cache control to prevent browser caching
+      cache: 'no-store',
     })
 
     if (response.ok) {
       const data = await response.json()
-      return {
+      const status = {
         completed: data.data?.completed || false,
         step: data.data?.step,
       }
+
+      // Cache the result
+      cachedStatus = status
+      cacheTimestamp = now
+
+      return status
     }
 
     return null
