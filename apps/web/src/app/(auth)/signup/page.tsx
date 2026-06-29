@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { signup } from "../actions"
 import { Icon } from "@/components/ui/Icon"
 import { GoogleIcon } from "@/components/ui/GoogleIcon"
-import { Loader2, ArrowRight, Sparkles, ChevronLeft } from "lucide-react"
+import { Loader2, ArrowRight, Sparkles, ChevronLeft, MailCheck } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { motion, AnimatePresence } from "framer-motion"
 import { OnboardingProvider, useOnboarding } from "@/contexts/onboarding-context"
@@ -37,7 +37,25 @@ function SignupContent() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [showOnboarding, setShowOnboarding] = useState(false)
+    const [showVerifyEmail, setShowVerifyEmail] = useState(false)
     const { currentStep, nextStep, prevStep, completeOnboarding } = useOnboarding()
+
+    useEffect(() => {
+        if (!showVerifyEmail) return
+
+        const supabase = createClient()
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+                // Email confirmed! Transition to onboarding
+                setShowVerifyEmail(false)
+                setShowOnboarding(true)
+            }
+        })
+
+        return () => {
+            subscription.unsubscribe()
+        }
+    }, [showVerifyEmail])
 
     async function handleSubmit(formData: FormData) {
         setIsLoading(true)
@@ -45,6 +63,8 @@ function SignupContent() {
         const result = await signup(formData)
         if (result?.error) {
             setError(result.error)
+        } else if (result?.requiresEmailConfirmation) {
+            setShowVerifyEmail(true)
         } else {
             setShowOnboarding(true)
         }
@@ -97,6 +117,42 @@ function SignupContent() {
     }
 
     const stepMeta = STEP_META[currentStep]
+
+    // ─── Verify Email Screen ──────────────────────────────────────────────────
+    if (showVerifyEmail) {
+        return (
+            <motion.div
+                key="verify-email"
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex flex-col items-center justify-center text-center space-y-6 py-12"
+            >
+                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4 border border-primary/20 shadow-[0_0_30px_rgba(var(--primary),0.2)]">
+                    <MailCheck className="w-10 h-10 text-primary" />
+                </div>
+                <div className="space-y-2">
+                    <h2 className="text-3xl font-extrabold text-foreground tracking-tight">Check your email</h2>
+                    <p className="text-muted-foreground font-medium max-w-[320px] mx-auto text-base">
+                        We sent a verification link to your email address. Click the link to securely sign in.
+                    </p>
+                </div>
+                
+                <div className="pt-8 border-t border-border w-full space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        <span className="font-bold text-foreground inline-flex items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                            Waiting for verification...
+                        </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        This page will automatically update once you click the link.
+                    </p>
+                </div>
+            </motion.div>
+        )
+    }
 
     // ─── Signup form ──────────────────────────────────────────────────────────
     if (!showOnboarding) {

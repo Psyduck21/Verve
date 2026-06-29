@@ -28,6 +28,7 @@ const WebhookSchema = z.object({
     id: z.string(),
     email: z.string(),
     created_at: z.string(),
+    email_confirmed_at: z.string().nullable().optional(),
     user_metadata: z.any().optional(),
   }),
 })
@@ -48,10 +49,13 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       try {
         // Use insert with onConflictDoNothing to prevent race conditions
         // If the user already exists, this will do nothing (no error)
+        const isVerified = !!record.email_confirmed_at;
+
         await db.insert(users).values({
           id: record.id,
           email: record.email,
           full_name: deriveFullName(record.email, record.user_metadata),
+          email_verified: isVerified,
           onboarding_completed: false,
           onboarding_step: 0,
           ai_requests_used_today: 0,

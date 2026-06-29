@@ -11,6 +11,13 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data.session) {
+      const next = searchParams.get('next')
+
+      // Handle password reset flow
+      if (next === '/update-password') {
+        return NextResponse.redirect(`${origin}/update-password`)
+      }
+
       // Create user record in backend if it doesn't exist
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/users/webhook`, {
