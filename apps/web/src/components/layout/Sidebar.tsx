@@ -121,10 +121,10 @@ export function Sidebar({ userEmail, userName, avatarUrl, onAIToggle }: SidebarP
                                     Settings
                                 </Link>
                                 <div className="h-px bg-border my-1 mx-1" />
-                                <Link href="/api/auth/logout" className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-destructive/10 text-destructive rounded-md transition-colors">
+                                <a href="/api/auth/logout" className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-destructive/10 text-destructive rounded-md transition-colors">
                                     <Icon icon={LogOut} size="sm" />
                                     Logout
-                                </Link>
+                                </a>
                             </PopoverContent>
                         </Popover>
                     </div>
