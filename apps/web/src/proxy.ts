@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { shouldRedirectToOnboarding, shouldRedirectFromOnboarding } from "@/lib/onboarding"
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
     })
@@ -38,13 +38,13 @@ export async function middleware(request: NextRequest) {
 
     // Protected app routes that require authentication
     const isAppRoute = pathname.startsWith('/dashboard') ||
-                       pathname.startsWith('/calendar') ||
-                       pathname.startsWith('/tasks') ||
-                       pathname.startsWith('/analytics') ||
-                       pathname.startsWith('/integrations') ||
-                       pathname.startsWith('/settings') ||
-                       pathname.startsWith('/profile') ||
-                       pathname.startsWith('/inbox')
+        pathname.startsWith('/calendar') ||
+        pathname.startsWith('/tasks') ||
+        pathname.startsWith('/analytics') ||
+        pathname.startsWith('/integrations') ||
+        pathname.startsWith('/settings') ||
+        pathname.startsWith('/profile') ||
+        pathname.startsWith('/inbox')
 
     // /onboarding is now in the (auth) group — requires auth but NOT the app shell
     const isOnboardingRoute = pathname.startsWith('/onboarding')
