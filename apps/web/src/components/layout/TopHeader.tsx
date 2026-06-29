@@ -44,7 +44,7 @@ export function TopHeader({
         >
             <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-                    <VerveLogo className="w-4 h-4 mr-0.5" />
+                    {/* <VerveLogo className="w-4 h-4 mr-0.5" /> */}
                     <span className="cursor-pointer hover:text-foreground transition-colors">Verve</span>
                     {pathSegments.map((segment, index) => (
                         <React.Fragment key={index}>
