@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { motion } from "framer-motion"
 import { format } from "date-fns"
-import { Calendar, AlignLeft, GripVertical, CheckCircle2, MoreHorizontal, ListTodo, Check } from "lucide-react"
+import { Calendar, AlignLeft, GripVertical, CheckCircle2, MoreHorizontal, ListTodo, Check, Lock } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import type { Task } from "@/hooks/useTasks"
 import { cn } from "@/lib/utils"
@@ -138,6 +138,14 @@ export function TaskCard({ task, isOverlay, isFocused, isSelected, onClick }: Ta
                     {task.category && (
                         <span className={cn("px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md", CATEGORY_COLORS[task.category as keyof typeof CATEGORY_COLORS] || "bg-muted text-muted-foreground")}>
                             {task.category}
+                        </span>
+                    )}
+                    
+                    {/* Time Locked Badge */}
+                    {task.is_time_locked && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-1">
+                            <Icon icon={Lock} size="sm" className="w-3 h-3" />
+                            Locked
                         </span>
                     )}
                 </div>
