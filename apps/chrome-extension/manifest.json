@@ -15,11 +15,7 @@
     "cookies"
   ],
   "host_permissions": [
-    "https://mail.google.com/*",
-    "http://localhost:3001/*",
-    "http://localhost:3000/*",
-    "https://verve-backend-4o63.onrender.com/*",
-    "https://verve-ai-native.vercel.app/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",
@@ -28,7 +24,10 @@
   "content_scripts": [
     {
       "matches": [
-        "https://mail.google.com/*"
+        "https://mail.google.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*"
       ],
       "js": [
         "content.js"

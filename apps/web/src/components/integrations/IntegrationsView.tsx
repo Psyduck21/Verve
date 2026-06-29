@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Mail, Calendar as CalendarIcon, Video, CreditCard, GitBranch, MessageSquare, CheckCircle2 } from "lucide-react"
+import { Mail, Calendar as CalendarIcon, Video, CreditCard, GitBranch, MessageSquare, CheckCircle2, Download, Puzzle } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import { cn } from "@/lib/utils"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/utils/apiClient"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { useIntegrations, useConnectIntegration, useDisconnectIntegration } from "@/hooks/useIntegrations"
 
 const INTEGRATIONS = [
     { id: "google",     name: "Google Calendar",   description: "Sync your events and meetings",    icon: CalendarIcon, color: "text-red-500",    requiresExtension: false },
@@ -17,8 +19,6 @@ const INTEGRATIONS = [
     { id: "github",     name: "GitHub",            description: "Link PRs to tasks",                icon: GitBranch,    color: "text-foreground", requiresExtension: true },
     { id: "slack",      name: "Slack",             description: "Send notifications to channels",   icon: MessageSquare,color: "text-pink-500",   requiresExtension: true },
 ]
-
-import { useIntegrations, useConnectIntegration, useDisconnectIntegration } from "@/hooks/useIntegrations"
 
 export default function IntegrationsView() {
     const { data: syncStates = [] } = useIntegrations()
@@ -40,6 +40,7 @@ export default function IntegrationsView() {
 
     const [loadingId, setLoadingId] = useState<string | null>(null)
     const [isExtensionInstalled, setIsExtensionInstalled] = useState(false)
+    const [showInstallModal, setShowInstallModal] = useState(false)
 
     useEffect(() => {
         // Detect Chrome extension
@@ -56,8 +57,8 @@ export default function IntegrationsView() {
         try {
             if (integration.requiresExtension) {
                 if (!isExtensionInstalled) {
-                    // Open dummy download link
-                    window.open("https://chrome.google.com/webstore", "_blank")
+                    // Show installation instructions modal instead of a generic webstore link
+                    setShowInstallModal(true)
                     return
                 }
                 
@@ -152,6 +153,61 @@ export default function IntegrationsView() {
                 </div>
             </div>
             </div>
+            
+            <Dialog open={showInstallModal} onOpenChange={setShowInstallModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Icon icon={Puzzle} className="text-primary" />
+                            Install Verve Extension
+                        </DialogTitle>
+                        <DialogDescription>
+                            Follow these simple steps to install the Verve extension manually.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="flex flex-col gap-4 py-4">
+                        <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground">
+                            <li>
+                                <strong className="text-foreground">Download</strong> the latest <code className="bg-muted px-1.5 py-0.5 rounded text-primary">.zip</code> file from our GitHub Releases.
+                            </li>
+                            <li>
+                                <strong className="text-foreground">Extract</strong> the downloaded zip file to a folder on your computer.
+                            </li>
+                            <li>
+                                Open Chrome and go to <code className="bg-muted px-1.5 py-0.5 rounded text-primary border border-border">chrome://extensions</code>
+                            </li>
+                            <li>
+                                Turn on <strong className="text-foreground">Developer mode</strong> in the top right corner.
+                            </li>
+                            <li>
+                                Click <strong className="text-foreground">Load unpacked</strong> and select the extracted folder.
+                            </li>
+                        </ol>
+                    </div>
+
+                    <DialogFooter className="sm:justify-between flex-row items-center mt-2">
+                        <button 
+                            type="button" 
+                            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => setShowInstallModal(false)}
+                        >
+                            Cancel
+                        </button>
+                        <a 
+                            href="https://github.com/Psyduck21/Verve/releases/tag/Extensions"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors border border-primary shadow-sm"
+                            onClick={() => setShowInstallModal(false)}
+                        >
+                            <Icon icon={Download} size="sm" />
+                            Download .zip
+                        </a>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     )
 }

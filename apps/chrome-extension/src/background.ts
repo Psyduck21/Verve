@@ -34,29 +34,96 @@ async function handleExtractIntent(payload: { raw_content: string, current_date_
 
 // Helper to get the auth token from the web app's cookies
 async function getAuthToken(): Promise<string | null> {
-  // We'll check both localhost and production domains for the cookie
-  const urls = ['http://localhost:3000', 'https://verve-ai-native.vercel.app']
+  let cookies: chrome.cookies.Cookie[] = []
 
-  for (const url of urls) {
-    const cookies = await chrome.cookies.getAll({ url })
-    const authCookie = cookies.find(c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'))
+  try {
+    console.log(`Checking all cookies in the browser...`)
+    cookies = await chrome.cookies.getAll({})
+    console.log(`Found ${cookies.length} total cookies in browser`)
 
-    if (authCookie) {
+    // Only get cookies for this specific Supabase project to avoid mixing tokens from other localhost projects
+    const baseName = 'sb-mrmvoxqqvwltigwsruyl-auth-token'
+
+    const chunkCookies = cookies.filter(c => c.name.startsWith(baseName + '.'))
+    const mainCookies = cookies.filter(c => c.name === baseName)
+
+    console.log("Found chunk cookies:", chunkCookies.map(c => ({ domain: c.domain, name: c.name, path: c.path })))
+    if (mainCookies.length) console.log("Found main cookies:", mainCookies.map(c => ({ domain: c.domain, name: c.name, path: c.path })))
+
+    // Group chunks by domain to prevent mixing chunks from localhost and production
+    const domainGroups: Record<string, chrome.cookies.Cookie[]> = {}
+    for (const c of chunkCookies) {
+      if (!domainGroups[c.domain]) domainGroups[c.domain] = []
+      domainGroups[c.domain].push(c)
+    }
+
+    let valsToTry: { domain: string, value: string }[] = []
+
+    // Add grouped chunks
+    for (const domain in domainGroups) {
+      const group = domainGroups[domain]
+      group.sort((a, b) => {
+        const idxA = parseInt(a.name.split('.').pop() || '0')
+        const idxB = parseInt(b.name.split('.').pop() || '0')
+        return idxA - idxB
+      })
+      valsToTry.push({ domain, value: group.map(c => c.value).join('') })
+    }
+
+    // Add main cookies
+    for (const mc of mainCookies) {
+      valsToTry.push({ domain: mc.domain, value: mc.value })
+    }
+
+    console.log(`Found ${valsToTry.length} potential tokens across different domains`)
+
+    for (const item of valsToTry) {
+      let val = item.value
+      if (!val) continue
       try {
-        let val = authCookie.value
+        val = decodeURIComponent(val)
+
         if (val.startsWith('base64-')) {
-          val = atob(val.slice(7))
-        } else {
-          val = decodeURIComponent(val)
+          let b64 = val.slice(7).replace(/-/g, '+').replace(/_/g, '/')
+          // Strip any accidental whitespace/newlines
+          b64 = b64.replace(/\s/g, '')
+          while (b64.length % 4) {
+            b64 += '='
+          }
+          val = decodeURIComponent(escape(atob(b64)))
         }
+
         const parsed = JSON.parse(val)
-        if (Array.isArray(parsed)) return parsed[0]
-        if (parsed?.access_token) return parsed.access_token
+        const tokenStr = Array.isArray(parsed) ? parsed[0] : parsed?.access_token
+        if (tokenStr) {
+          // Check if the token is expired by decoding the JWT payload
+          try {
+            let jwtB64 = tokenStr.split('.')[1]
+            jwtB64 = jwtB64.replace(/-/g, '+').replace(/_/g, '/')
+            while (jwtB64.length % 4) {
+              jwtB64 += '='
+            }
+            const jwtPayload = JSON.parse(decodeURIComponent(escape(atob(jwtB64))))
+            if (jwtPayload.exp && jwtPayload.exp * 1000 > Date.now()) {
+              console.log(`Successfully extracted a valid, unexpired token from domain: ${item.domain}`)
+              return tokenStr
+            } else {
+              console.log("Token extracted, but it is already expired. Trying next...")
+            }
+          } catch (jwtErr) {
+            console.log("Could not decode JWT, returning anyway...")
+            return tokenStr
+          }
+        }
       } catch (err) {
-        console.error('Failed to parse auth cookie', err)
+        console.error('Failed to parse a cookie group', err)
       }
     }
+  } catch (err) {
+    console.error(`Failed to get cookies:`, err)
   }
+
+  console.log('No auth token found in any of the cookies!')
   return null
 }
 

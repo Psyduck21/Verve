@@ -71,3 +71,4 @@ ios/
 
 .agents/
 docs/
+*.zip
