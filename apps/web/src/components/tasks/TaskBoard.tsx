@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 
 const genTempId = () => `tmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`
 import { 
@@ -68,6 +68,10 @@ export default function TaskBoard({ initialTasks }: TaskBoardProps) {
     const [groupByRoutine, setGroupByRoutine] = useState(false)
     const queryClient = useQueryClient()
     const { data: routines = [] } = useRoutines()
+    
+    // Key sequence buffer for multi-key shortcuts (e.g. 'ul')
+    const keyBuffer = useRef<string[]>([])
+    const bufferTimeout = useRef<NodeJS.Timeout | null>(null)
     
     useEffect(() => {
         setTasks(initialTasks)
@@ -214,6 +218,36 @@ export default function TaskBoard({ initialTasks }: TaskBoardProps) {
             if (flattenedTasks.length === 0) return;
 
             const currentIndex = flattenedTasks.findIndex(item => item.id === focusedTaskId);
+            const key = e.key.toLowerCase();
+
+            // Handle 'u' prefix sequences (like 'u' -> 'l')
+            if (keyBuffer.current[0] === 'u') {
+                e.preventDefault();
+                if (bufferTimeout.current) clearTimeout(bufferTimeout.current);
+                keyBuffer.current = [];
+                
+                if (key === 'l') {
+                    // Unlock the task
+                    if (focusedTaskId || selectedTaskIds.size > 0) {
+                        const targetIds = selectedTaskIds.size > 0 ? Array.from(selectedTaskIds) : [focusedTaskId!];
+                        setTasks(prev => prev.map(t => targetIds.includes(t.id) ? { ...t, is_time_locked: false } : t));
+                        targetIds.forEach((id) => updateTaskStatus.mutate({ id, is_time_locked: false }));
+                    }
+                    return;
+                }
+            }
+
+            // Start 'u' sequence
+            if (key === 'u' && !e.ctrlKey && !e.metaKey && !e.altKey && (focusedTaskId || selectedTaskIds.size > 0)) {
+                e.preventDefault();
+                keyBuffer.current = ['u'];
+                
+                // Clear the buffer after a short delay so they don't get stuck in 'u' mode forever
+                bufferTimeout.current = setTimeout(() => {
+                    keyBuffer.current = [];
+                }, 400); 
+                return;
+            }
 
             if (isHotkey(e, KEYBINDINGS.TASK_BOARD.SHIFT_SELECT_DOWN)) {
                 e.preventDefault();
@@ -292,24 +326,16 @@ export default function TaskBoard({ initialTasks }: TaskBoardProps) {
             } else if ((focusedTaskId || selectedTaskIds.size > 0) && isHotkey(e, KEYBINDINGS.TASK_BOARD.SET_TIME_LOCK)) {
                 e.preventDefault();
                 const targetIds = selectedTaskIds.size > 0 ? Array.from(selectedTaskIds) : [focusedTaskId!];
-                setTasks(prev => prev.map(t => targetIds.includes(t.id) ? { ...t, is_time_locked: true } : t));
-                targetIds.forEach((id) => updateTaskStatus.mutate({ id, is_time_locked: true }));
+                
+                const firstTask = findBoardItem(targetIds[0]);
+                const newLockStatus = firstTask && !isSubtaskItem(firstTask) ? !firstTask.is_time_locked : true;
+                
+                setTasks(prev => prev.map(t => targetIds.includes(t.id) ? { ...t, is_time_locked: newLockStatus } : t));
+                targetIds.forEach((id) => updateTaskStatus.mutate({ id, is_time_locked: newLockStatus }));
             } else if ((focusedTaskId || selectedTaskIds.size > 0) && isHotkey(e, KEYBINDINGS.TASK_BOARD.SET_STATUS_TODO)) {
                 e.preventDefault();
                 const targetIds = selectedTaskIds.size > 0 ? Array.from(selectedTaskIds) : [focusedTaskId!];
                 updateStatusForTaskIds(targetIds, 'not_started');
-            } else if ((focusedTaskId || selectedTaskIds.size > 0) && isHotkey(e, KEYBINDINGS.TASK_BOARD.UNSCHEDULE)) {
-                e.preventDefault();
-                const targetIds = selectedTaskIds.size > 0 ? Array.from(selectedTaskIds) : [focusedTaskId!];
-                for (const id of targetIds) {
-                    const item = findBoardItem(id)
-                    if (!item) continue
-                    if (!isSubtaskItem(item)) {
-                        updateTaskStatus.mutate({ id, scheduled_at: null });
-                        setTasks(prev => prev.filter(t => t.id !== id));
-                    }
-                }
-                if (selectedTaskIds.size > 0) setSelectedTaskIds(new Set());
             } else if ((focusedTaskId || selectedTaskIds.size > 0) && isHotkey(e, KEYBINDINGS.TASK_BOARD.SET_STATUS_OVERDUE)) {
                 e.preventDefault();
                 const targetIds = selectedTaskIds.size > 0 ? Array.from(selectedTaskIds) : [focusedTaskId!];
@@ -380,7 +406,10 @@ export default function TaskBoard({ initialTasks }: TaskBoardProps) {
         };
 
         document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            if (bufferTimeout.current) clearTimeout(bufferTimeout.current);
+        }
     }, [tasks, focusedTaskId, updateTaskStatus, deleteTask, selectedTaskIds, expandedSubtaskIds, subtasksByTaskId]);
 
     const activeTask = activeId ? tasks.find(t => t.id === activeId) : null

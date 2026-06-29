@@ -150,14 +150,25 @@ STRICT RULES:
       })
 
       const validTaskIds = new Set(userTasks.map(t => t.id))
-      for (const action of aiResponse.data) {
+      const timeLockedTaskIds = new Set(userTasks.filter(t => t.is_time_locked).map(t => t.id))
+      
+      const filteredActions = aiResponse.data.filter((action: any) => {
         if (action.action === 'CANCEL') {
           throw new Error('AI generated a CANCEL action. Use MOVE/UPDATE to reschedule tasks instead of cancellation.')
         }
-        if (action.task_id && !validTaskIds.has(action.task_id)) {
-          throw new Error(`AI generated invalid task_id: ${action.task_id}`)
+        if (action.action !== 'CREATE' && action.task_id) {
+          if (!validTaskIds.has(action.task_id)) {
+            throw new Error(`AI generated invalid task_id: ${action.task_id}`)
+          }
+          if (timeLockedTaskIds.has(action.task_id)) {
+            // Drop attempts to move time-locked tasks
+            return false
+          }
         }
-      }
+        return true
+      })
+
+      aiResponse.data = filteredActions
 
       await this.logUsage(userId, 'reschedule', aiResponse, Date.now() - start)
       return aiResponse.data
@@ -193,14 +204,25 @@ Current Context: ${JSON.stringify(body.context.tasks)}`
       })
 
       const validTaskIds = new Set(body.context.tasks.map(t => t.id))
-      for (const action of aiResponse.data) {
+      const timeLockedTaskIds = new Set(body.context.tasks.filter(t => t.is_time_locked).map(t => t.id))
+      
+      const filteredActions = aiResponse.data.filter((action: any) => {
         if (action.action === 'CANCEL') {
           throw new Error('AI generated a CANCEL action. Use MOVE/UPDATE to reschedule tasks instead of cancellation.')
         }
-        if (action.action !== 'CREATE' && action.task_id && !validTaskIds.has(action.task_id)) {
-          throw new Error(`AI generated invalid task_id: ${action.task_id}`)
+        if (action.action !== 'CREATE' && action.task_id) {
+          if (!validTaskIds.has(action.task_id)) {
+            throw new Error(`AI generated invalid task_id: ${action.task_id}`)
+          }
+          if (timeLockedTaskIds.has(action.task_id)) {
+            // Drop attempts to move time-locked tasks
+            return false
+          }
         }
-      }
+        return true
+      })
+
+      aiResponse.data = filteredActions
 
       await this.logUsage(userId, 'parse_task', aiResponse, Date.now() - start) // Reusing parse_task enum for omnibox usage logging
       return aiResponse.data

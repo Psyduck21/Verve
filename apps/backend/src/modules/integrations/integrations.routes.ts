@@ -58,7 +58,7 @@ export const integrationsRoutes: FastifyPluginAsync = async (app) => {
       status: 'not_started',
       scheduled_at: scheduledAt,
       estimated_duration_minutes: duration,
-      is_time_locked: false,
+      is_time_locked: true,
       external_provider: body.external_provider,
       external_id: body.external_id,
       external_link: body.external_link,
