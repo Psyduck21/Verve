@@ -112,11 +112,11 @@ export function Sidebar({ userEmail, userName, avatarUrl, onAIToggle }: SidebarP
                                     <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
                                 </div>
                                 <div className="h-px bg-border my-1 mx-1" />
-                                <Link href="/profile" className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-muted rounded-md text-foreground transition-colors">
+                                <Link href="/profile" prefetch={false} className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-muted rounded-md text-foreground transition-colors">
                                     <Icon icon={User} size="sm" className="text-muted-foreground" />
                                     Profile
                                 </Link>
-                                <Link href="/settings" className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-muted rounded-md text-foreground transition-colors">
+                                <Link href="/settings" prefetch={false} className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-muted rounded-md text-foreground transition-colors">
                                     <Icon icon={Settings} size="sm" className="text-muted-foreground" />
                                     Settings
                                 </Link>
@@ -181,7 +181,7 @@ function SidebarItem({ href, icon: IconComponent, label, active, showLabel, isRa
     }
 
     return (
-        <Link href={href!} className={base}>
+        <Link href={href!} prefetch={false} className={base}>
             {content}
         </Link>
     )
