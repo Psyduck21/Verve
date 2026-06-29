@@ -57,6 +57,7 @@ export async function signup(formData: FormData) {
             },
         },
     })
+    console.log("Supabase signUp response:", JSON.stringify({ data, error }, null, 2))
 
     if (error) {
         let errorMessage = error.message

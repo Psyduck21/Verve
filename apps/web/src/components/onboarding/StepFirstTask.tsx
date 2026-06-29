@@ -53,13 +53,6 @@ export function StepFirstTask() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold">Create Your First Task</h3>
-        <p className="text-sm text-muted-foreground">
-          Add a task to get started. This helps you understand how Verve works.
-        </p>
-      </div>
-
       {!createdTask ? (
         <>
           {/* Task Input */}

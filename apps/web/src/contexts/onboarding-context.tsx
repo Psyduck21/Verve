@@ -19,6 +19,7 @@ export interface OnboardingData {
   first_task_created?: boolean
   first_task_title?: string
   shortcuts_learned?: boolean
+  extension_installed?: boolean
 }
 
 export interface OnboardingProgress {

@@ -31,19 +31,6 @@ export function StepSuccess({ onComplete }: StepSuccessProps) {
         <CheckCircle2 size={48} className="text-green-500" />
       </motion.div>
 
-      {/* Success Message */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="space-y-3"
-      >
-        <h3 className="text-2xl font-bold">You're All Set!</h3>
-        <p className="text-muted-foreground text-sm">
-          Your personalized Verve experience is ready. Here's what we've set up for you:
-        </p>
-      </motion.div>
-
       {/* Summary Cards */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

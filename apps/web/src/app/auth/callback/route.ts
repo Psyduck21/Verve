@@ -32,6 +32,7 @@ export async function GET(request: Request) {
               id: data.user.id,
               email: data.user.email,
               created_at: data.user.created_at,
+              email_confirmed_at: data.user.email_confirmed_at,
               user_metadata: data.user.user_metadata,
             },
           }),

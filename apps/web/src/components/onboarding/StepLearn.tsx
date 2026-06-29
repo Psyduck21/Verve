@@ -49,12 +49,6 @@ export function StepLearn() {
   const totalItems = SHORTCUTS.length + AI_COMMANDS.length
   return (
     <div className="space-y-8">
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold">Learn the Basics</h3>
-        <p className="text-sm text-muted-foreground">
-          Master these shortcuts and AI commands to unlock Verve's full potential.
-        </p>
-      </div>
 
       {/* Progress */}
       <div className="flex items-center gap-3">

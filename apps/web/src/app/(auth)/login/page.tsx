@@ -74,7 +74,11 @@ export default function LoginPage() {
                 <div className="flex-grow border-t border-border"></div>
             </div>
 
-            <form action={handleSubmit} className="space-y-4">
+            <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                await handleSubmit(formData);
+            }} className="space-y-4">
                 <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-bold text-foreground ml-1">Email</Label>
                     <Input
