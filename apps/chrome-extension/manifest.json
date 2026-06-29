@@ -3,15 +3,23 @@
   "name": "Verve Inbox Integrations",
   "description": "Send tasks and emails directly to your Verve inbox",
   "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxh3TmkhHdr6zYHyXlZ9+Cdp/2QH5WY3zVkxm0z2HJN9hCBeWo061/FlpkJC0p/QVM54aN48iGXHaARKHmLTPsbNhijmONBWEu/HEDhFB4ZPeun+hWhhvjP+IXc/Q2FamiRQmAdQ+drKvb4Hoe0R/Ui/gj3+jswezzQ4jtaZhbfIxeSebLAAl5FrVuc3FiaePLaxL+v+88h22xNAv1/gnS0w7ktPP2T0wT/xJq+2eA1cEG79Pasu+Mk05CA6KR/abyahn+Yi9wOtMdbHuJKaQVUe4EsuDmSD2Is+Gf849IumGr0fnUnSScFwimr3c9qbQG9a+aY9HKsk8sAdF5Z3GdwIDAQAB",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "cookies"
   ],
   "host_permissions": [
     "https://mail.google.com/*",
     "http://localhost:3001/*",
-    "https://focal-backend.internal/*",
-    "https://verve-backend-4o63.onrender.com/*"
+    "http://localhost:3000/*",
+    "https://verve-backend-4o63.onrender.com/*",
+    "https://verve-ai-native.vercel.app/*"
   ],
   "background": {
     "service_worker": "background.js",

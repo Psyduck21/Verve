@@ -32,6 +32,7 @@ export const corsPlugin = fp(async (app: FastifyInstance) => {
       const isChromeExtension = origin && origin.startsWith('chrome-extension://')
       const isExtensionAllowed = isChromeExtension && (
         process.env.NODE_ENV === 'development' ||
+        origin === 'chrome-extension://pklbajhogpipogmepbpalmibijoeighf' ||
         allowedExtensionIds.some(id => origin?.startsWith(`chrome-extension://${id}`))
       )
 

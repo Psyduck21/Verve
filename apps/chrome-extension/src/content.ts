@@ -1,7 +1,7 @@
 // Gmail uses dynamic classes, but typically the toolbar at the top of an open email 
 // has role="toolbar" or similar stable selectors.
 
-function injectFocalButton() {
+function injectVerveButton() {
   // A simplified approach: look for the email action toolbar
   // In Gmail, the top toolbar when viewing an email often has the class '.iH' or '.G-tF'
   // Since Gmail classes change, a more robust approach is to find elements by aria-label 
@@ -223,11 +223,11 @@ function injectFocalButton() {
           } else {
             submitBtn.innerText = 'Failed ✗'
             submitBtn.style.backgroundColor = '#EF4444'
-            console.error('Focal extension error:', response?.error)
+            console.error('Verve extension error:', response?.error)
           }
 
           setTimeout(() => {
-            btn.innerText = 'Save to Focal'
+            btn.innerText = 'Save to Verve'
             btn.style.backgroundColor = '#000'
             btn.style.opacity = '1'
           }, 3000)
@@ -240,4 +240,4 @@ function injectFocalButton() {
 }
 
 // Re-run injection periodically since Gmail is an SPA
-setInterval(injectFocalButton, 2000)
+setInterval(injectVerveButton, 2000)
