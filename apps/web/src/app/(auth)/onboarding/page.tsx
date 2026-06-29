@@ -25,7 +25,7 @@ const STEP_META: Record<number, { title: string; description: string }> = {
     4: { title: "Install Chrome Extension", description: "Access Verve instantly from any tab to capture tasks on the go." },
     5: { title: "Create Your First Task.", description: "Add something you need to do — Verve will help you schedule it." },
     6: { title: "Learn the Basics.", description: "Master shortcuts and AI commands to unlock Verve's full potential." },
-    7: { title: "You're All Set! 🎉", description: "Your personalized Verve experience is ready. Let's go." },
+    7: { title: "You're All Set!", description: "Your personalized Verve experience is ready. Let's go." },
 }
 
 function OnboardingContent() {
