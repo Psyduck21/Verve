@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 import { shouldRedirectToOnboarding, shouldRedirectFromOnboarding } from "@/lib/onboarding"
 
-export async function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
     })

@@ -86,8 +86,8 @@ export default function AuthLayout({
                 </div>
 
                 {/* Right Side: Form / Onboarding steps */}
-                <div className="w-full lg:w-1/2 flex items-start justify-center p-6 sm:p-10 pt-24 bg-card relative z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.02)] h-screen overflow-y-auto">
-                    <div className="w-full max-w-[460px] pb-12">
+                <div className="w-full lg:w-1/2 flex flex-col p-6 sm:p-10 bg-card relative z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.02)] h-screen overflow-y-auto">
+                    <div className="w-full max-w-[460px] mx-auto my-auto pt-24 pb-12">
                         {children}
                     </div>
                 </div>
