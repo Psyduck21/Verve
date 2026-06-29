@@ -212,7 +212,7 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
             } else if (isHotkey(e, KEYBINDINGS.CALENDAR.UNSCHEDULE) && focusedEventId) {
                 e.preventDefault()
                 const focusedEvent = visibleEvents.find(ev => ev.task?.id === focusedEventId)
-                if (focusedEvent && focusedEvent.task) {
+                if (focusedEvent && focusedEvent.task && !focusedEvent.task.is_time_locked) {
                     updateTask({ id: focusedEvent.task.id, scheduled_at: null })
                 }
             }
@@ -326,6 +326,9 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
     const onEventDrop = ({ event, start, end }: any) => {
         const taskId = event.task?.id
         if (!taskId) return
+        
+        // Skip optimistic UI and drag action for time-locked tasks
+        if (event.task?.is_time_locked) return
 
         const durationMins = Math.round((end.getTime() - start.getTime()) / 60000)
 
@@ -339,6 +342,9 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
     const onEventResize = ({ event, start, end }: any) => {
         const taskId = event.task?.id
         if (!taskId) return
+
+        // Skip optimistic UI and resize action for time-locked tasks
+        if (event.task?.is_time_locked) return
 
         const durationMins = Math.round((end.getTime() - start.getTime()) / 60000)
 

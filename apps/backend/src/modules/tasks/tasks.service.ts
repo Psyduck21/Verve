@@ -120,8 +120,23 @@ export class TasksService {
       updatePayload.scheduled_at = coreUpdates.scheduled_at ? new Date(coreUpdates.scheduled_at) : null
     }
 
-    const existingTask = await db.select({ scheduled_at: tasks.scheduled_at }).from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.user_id, userId))).limit(1)
+    const existingTask = await db.select({ scheduled_at: tasks.scheduled_at, is_time_locked: tasks.is_time_locked }).from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.user_id, userId))).limit(1)
+    if (!existingTask.length) {
+      throw new Error('Task not found or unauthorized')
+    }
+
     const previousScheduledAt = existingTask[0]?.scheduled_at
+    const isTimeLocked = existingTask[0]?.is_time_locked
+
+    // Reject manual time modifications for time-locked tasks
+    if (isTimeLocked && coreUpdates.scheduled_at !== undefined) {
+      const newTime = coreUpdates.scheduled_at ? new Date(coreUpdates.scheduled_at).getTime() : null
+      const oldTime = previousScheduledAt ? previousScheduledAt.getTime() : null
+      
+      if (newTime !== oldTime) {
+        throw new Error('Cannot reschedule a time-locked task. Please unlock it first.')
+      }
+    }
 
     const updatedTask = await db.transaction(async (tx) => {
       const result = await tx
