@@ -10,7 +10,7 @@ import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress"
 import { StepProfile } from "@/components/onboarding/StepProfile"
 import { StepGoals } from "@/components/onboarding/StepGoals"
 import { StepAISetup } from "@/components/onboarding/StepAISetup"
-import { StepIntegrations } from "@/components/onboarding/StepIntegrations"
+import { StepExtension } from "@/components/onboarding/StepExtension"
 import { StepFirstTask } from "@/components/onboarding/StepFirstTask"
 import { StepLearn } from "@/components/onboarding/StepLearn"
 import { StepSuccess } from "@/components/onboarding/StepSuccess"
@@ -22,7 +22,7 @@ const STEP_META: Record<number, { title: string; description: string }> = {
     1: { title: "Welcome to Verve.", description: "Tell us about your schedule so we can set up your perfect workflow." },
     2: { title: "Set Your Goals.", description: "How much time do you want to invest each day, and in what areas?" },
     3: { title: "AI-Powered Setup.", description: "Let Verve generate your first personalized routine automatically." },
-    4: { title: "Connect Your Calendar.", description: "Sync your existing calendars to avoid conflicts and find free time." },
+    4: { title: "Install Chrome Extension", description: "Access Verve instantly from any tab to capture tasks on the go." },
     5: { title: "Create Your First Task.", description: "Add something you need to do — Verve will help you schedule it." },
     6: { title: "Learn the Basics.", description: "Master shortcuts and AI commands to unlock Verve's full potential." },
     7: { title: "You're All Set! 🎉", description: "Your personalized Verve experience is ready. Let's go." },
@@ -75,7 +75,7 @@ function OnboardingContent() {
             case 1: return <StepProfile />
             case 2: return <StepGoals />
             case 3: return <StepAISetup />
-            case 4: return <StepIntegrations />
+            case 4: return <StepExtension />
             case 5: return <StepFirstTask />
             case 6: return <StepLearn />
             case 7: return <StepSuccess onComplete={handleComplete} />
