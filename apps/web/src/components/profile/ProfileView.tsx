@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Upload } from "lucide-react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/utils/apiClient"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function ProfileView() {
     const queryClient = useQueryClient()
@@ -63,14 +64,22 @@ export default function ProfileView() {
                         {/* AI Quota */}
                         <div className="p-4 border border-border rounded-lg bg-background/50">
                             <p className="text-sm font-medium text-foreground">AI Requests</p>
-                            <p className="text-xs text-muted-foreground mt-1">{profile.aiUsed} of {profile.aiLimit} used today</p>
+                            {isLoading ? (
+                                <Skeleton className="h-4 w-32 mt-2" />
+                            ) : (
+                                <p className="text-xs text-muted-foreground mt-1">{profile.aiUsed} of {profile.aiLimit} used today</p>
+                            )}
                         </div>
 
                         {/* Avatar Upload */}
                         <div className="flex items-center gap-6 pb-6 border-b border-border/50">
-                            <div className="h-20 w-20 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center text-primary text-2xl font-bold shadow-sm">
-                                {profile.name.charAt(0) || 'U'}
-                            </div>
+                            {isLoading ? (
+                                <Skeleton className="h-20 w-20 rounded-full" />
+                            ) : (
+                                <div className="h-20 w-20 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center text-primary text-2xl font-bold shadow-sm">
+                                    {profile.name.charAt(0) || 'U'}
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-secondary text-secondary-foreground rounded-xl hover:bg-secondary/80 transition-colors">
                                     <Upload className="h-4 w-4" />
@@ -84,32 +93,44 @@ export default function ProfileView() {
                         <div className="space-y-5">
                             <div className="grid gap-2">
                                 <label className="text-sm font-medium text-foreground">Full Name</label>
-                                <input
-                                    type="text"
-                                    value={profile.name}
-                                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                />
+                                {isLoading ? (
+                                    <Skeleton className="h-9 w-full rounded-lg" />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={profile.name}
+                                        onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    />
+                                )}
                             </div>
 
                             <div className="grid gap-2">
                                 <label className="text-sm font-medium text-foreground">Email Address</label>
-                                <input
-                                    type="email"
-                                    value={profile.email}
-                                    disabled
-                                    className="w-full px-3 py-2 bg-muted/50 border border-border rounded-lg text-sm text-muted-foreground cursor-not-allowed"
-                                />
+                                {isLoading ? (
+                                    <Skeleton className="h-9 w-full rounded-lg" />
+                                ) : (
+                                    <input
+                                        type="email"
+                                        value={profile.email}
+                                        disabled
+                                        className="w-full px-3 py-2 bg-muted/50 border border-border rounded-lg text-sm text-muted-foreground cursor-not-allowed"
+                                    />
+                                )}
                             </div>
 
                             <div className="grid gap-2">
                                 <label className="text-sm font-medium text-foreground">Role</label>
-                                <input
-                                    type="text"
-                                    value={profile.role}
-                                    onChange={(e) => setProfile({ ...profile, role: e.target.value })}
-                                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                />
+                                {isLoading ? (
+                                    <Skeleton className="h-9 w-full rounded-lg" />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={profile.role}
+                                        onChange={(e) => setProfile({ ...profile, role: e.target.value })}
+                                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    />
+                                )}
                             </div>
                         </div>
 

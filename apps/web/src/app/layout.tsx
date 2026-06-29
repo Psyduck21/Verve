@@ -5,6 +5,7 @@ import { Providers } from "@/components/Providers"
 import { OfflineIndicator } from "@/components/ui/offline-indicator"
 import { GlobalShortcuts } from "@/components/GlobalShortcuts"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import NextTopLoader from 'nextjs-toploader'
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default function RootLayout({
             suppressHydrationWarning
         >
             <body className="min-h-screen bg-background font-sans antialiased text-foreground" suppressHydrationWarning>
+                <NextTopLoader color="#2563EB" showSpinner={false} />
                 <ErrorBoundary>
                     <Providers>
                         {children}
