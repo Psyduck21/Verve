@@ -4,6 +4,7 @@ import { eq, and, desc, isNull } from '@verve/db'
 import { z } from 'zod'
 import { redis, RedisKeys } from '../../lib/redis'
 import { realtimeService } from '../../lib/realtime'
+import { notificationQueue } from '../../lib/queue'
 
 export const CreateSubtaskSchema = z.object({
   title: z.string().min(1).max(200),
@@ -127,6 +128,10 @@ export class TasksService {
 
     await this.invalidateDashboardSummaries(userId, [createdTask.scheduled_at])
     
+    if (recurrence_rule) {
+      await notificationQueue.add('check-recurrences', {}, { jobId: `manual-trigger-${Date.now()}`, priority: 1 })
+    }
+
     // Broadcast creation to clients
     await realtimeService.broadcastEvent(userId, 'task_created', createdTask)
     
@@ -254,6 +259,11 @@ export class TasksService {
     })
 
     await this.invalidateDashboardSummaries(userId, [previousScheduledAt, updatedTask.scheduled_at])
+
+    // Manually trigger a check for recurrences if the task is completed or recurrence rule was changed
+    if (coreUpdates.status === 'completed' || recurrence_rule !== undefined) {
+      await notificationQueue.add('check-recurrences', {}, { jobId: `manual-trigger-${Date.now()}`, priority: 1 })
+    }
 
     // Broadcast update to clients
     await realtimeService.broadcastEvent(userId, 'task_updated', updatedTask)

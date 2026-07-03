@@ -72,3 +72,5 @@ ios/
 .agents/
 docs/
 *.zip
+
+performance-tests/
