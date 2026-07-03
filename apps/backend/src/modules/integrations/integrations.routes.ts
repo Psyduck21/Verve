@@ -4,6 +4,7 @@ import { db } from '../../lib/db'
 import { tasks, routines, taskExternalMetadata } from '@verve/db'
 import { eq, and, desc } from '@verve/db'
 import { TasksService } from '../tasks/tasks.service'
+import { IntegrationsService } from './integrations.service'
 
 export const integrationsRoutes: FastifyPluginAsync = async (app) => {
 
@@ -69,4 +70,17 @@ export const integrationsRoutes: FastifyPluginAsync = async (app) => {
     return reply.send({ success: true, data: task })
   })
 
+  // POST /v1/integrations/:provider/:integrationId/sync
+  app.post('/:provider/:integrationId/sync', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
+    const user = req.user!
+    const { provider, integrationId } = req.params as { provider: string, integrationId: string }
+
+    try {
+      const integrationsService = new IntegrationsService(app.log)
+      const result = await integrationsService.syncProvider(user.id, integrationId, provider)
+      return reply.send({ success: true, data: result })
+    } catch (error: any) {
+      return reply.status(400).send({ success: false, error: error.message })
+    }
+  })
 }

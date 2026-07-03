@@ -3,6 +3,7 @@ import { tasks, routines, tombstones, taskRecurrences, taskExternalMetadata } fr
 import { eq, and, desc } from '@verve/db'
 import { z } from 'zod'
 import { redis, RedisKeys } from '../../lib/redis'
+import { realtimeService } from '../../lib/realtime'
 
 export const CreateSubtaskSchema = z.object({
   title: z.string().min(1).max(200),
@@ -98,6 +99,10 @@ export class TasksService {
     })
 
     await this.invalidateDashboardSummaries(userId, [createdTask.scheduled_at])
+    
+    // Broadcast creation to clients
+    await realtimeService.broadcastEvent(userId, 'task_created', createdTask)
+    
     return createdTask
   }
 
@@ -191,6 +196,10 @@ export class TasksService {
     })
 
     await this.invalidateDashboardSummaries(userId, [previousScheduledAt, updatedTask.scheduled_at])
+
+    // Broadcast update to clients
+    await realtimeService.broadcastEvent(userId, 'task_updated', updatedTask)
+    
     return updatedTask
   }
 
@@ -217,6 +226,10 @@ export class TasksService {
     }
 
     await this.invalidateDashboardSummaries(userId, [result[0].scheduled_at])
+
+    // Broadcast deletion to clients
+    await realtimeService.broadcastEvent(userId, 'task_deleted', { id: taskId })
+
     return result[0]
   }
 

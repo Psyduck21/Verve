@@ -41,7 +41,8 @@ export const googleRoutes: FastifyPluginAsync = async (app) => {
 
     if (error) {
       app.log.error({ error }, 'Google OAuth error')
-      return reply.redirect('http://localhost:3000/calendar?error=oauth_failed')
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+      return reply.redirect(`${frontendUrl}/calendar?error=oauth_failed`)
     }
 
     if (!code || !stateStr) {
@@ -107,17 +108,19 @@ export const googleRoutes: FastifyPluginAsync = async (app) => {
       // await registerCalendarWebhook(userId, tokens)
 
       // Redirect to the appropriate page based on redirectTo
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
       const redirectUrl = redirectTo === 'onboarding' 
-        ? 'http://localhost:3000/onboarding?success=google_connected'
-        : 'http://localhost:3000/calendar?success=google_connected'
+        ? `${frontendUrl}/onboarding?success=google_connected`
+        : `${frontendUrl}/calendar?success=google_connected`
       
       return reply.redirect(redirectUrl)
 
     } catch (err) {
       app.log.error(err, 'Failed to exchange Google OAuth token')
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
       const redirectUrl = redirectTo === 'onboarding'
-        ? 'http://localhost:3000/onboarding?error=token_exchange_failed'
-        : 'http://localhost:3000/calendar?error=token_exchange_failed'
+        ? `${frontendUrl}/onboarding?error=token_exchange_failed`
+        : `${frontendUrl}/calendar?error=token_exchange_failed`
       return reply.redirect(redirectUrl)
     }
   })

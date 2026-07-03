@@ -1,5 +1,5 @@
 import { NodeSDK } from '@opentelemetry/sdk-node'
-import { FastifyInstrumentation } from '@opentelemetry/instrumentation-fastify'
+import { FastifyOtelInstrumentation as FastifyInstrumentation } from '@fastify/otel'
 import { PgInstrumentation } from '@opentelemetry/instrumentation-pg'
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-base'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc'

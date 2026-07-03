@@ -18,7 +18,8 @@ COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_module
 COPY --from=deps /app/packages/db/node_modules     ./packages/db/node_modules
 COPY --from=deps /app/apps/backend/node_modules    ./apps/backend/node_modules
 COPY . .
-RUN pnpm --filter=@focal/backend build
+# Fixed: Use @verve/backend since package.json was renamed
+RUN pnpm --filter=@verve/backend build
 
 # ── Production stage ──────────────────────────────────────────
 FROM node:20-alpine AS runner

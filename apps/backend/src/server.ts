@@ -86,9 +86,18 @@ async function bootstrap() {
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? 'info',
-      transport: process.env.NODE_ENV === 'development'
-        ? { target: 'pino-pretty', options: { colorize: true } }
-        : undefined,
+      transport: process.env.NODE_ENV === 'production' && process.env.AXIOM_TOKEN && process.env.AXIOM_DATASET
+        ? {
+            target: 'pino-axiom',
+            options: {
+              token: process.env.AXIOM_TOKEN,
+              dataset: process.env.AXIOM_DATASET,
+              orgId: process.env.AXIOM_ORG_ID,
+            }
+          }
+        : process.env.NODE_ENV === 'development'
+          ? { target: 'pino-pretty', options: { colorize: true } }
+          : undefined,
     },
     requestIdHeader: 'x-request-id',
     genReqId: () => crypto.randomUUID(),
