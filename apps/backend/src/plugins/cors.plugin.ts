@@ -16,26 +16,29 @@ export const corsPlugin = fp(async (app: FastifyInstance) => {
         return cb(null, true)
       }
 
-      // Build allowed origins list for production
-      const allowedOrigins = [
-        'https://verve.app',
-        'https://www.verve.app',
-        'https://mail.google.com',
-        'https://verve-ai-native.vercel.app',
-      ]
+      if (!origin) {
+        return cb(null, true)
+      }
 
-      if (process.env.FRONTEND_URL) {
-        allowedOrigins.push(process.env.FRONTEND_URL)
+      const isAllowedUrl = () => {
+        try {
+          const url = new URL(origin)
+          return ['verve.app', 'vercel.app', 'localhost'].some(domain => 
+            url.hostname === domain || url.hostname.endsWith(`.${domain}`)
+          ) || origin === 'https://mail.google.com'
+        } catch {
+          return false
+        }
       }
 
       // Check if origin is a chrome extension. Allow if explicitly whitelisted.
-      const isChromeExtension = origin && origin.startsWith('chrome-extension://')
+      const isChromeExtension = origin.startsWith('chrome-extension://')
       const isExtensionAllowed = isChromeExtension && (
         origin === 'chrome-extension://pklbajhogpipogmepbpalmibijoeighf' ||
-        allowedExtensionIds.some(id => origin?.startsWith(`chrome-extension://${id}`))
+        allowedExtensionIds.some(id => origin.startsWith(`chrome-extension://${id}`))
       )
 
-      if (!origin || allowedOrigins.includes(origin) || isExtensionAllowed) {
+      if (isAllowedUrl() || isExtensionAllowed) {
         cb(null, true)
       } else {
         cb(new Error(`CORS: Origin not allowed: ${origin}`), false)
@@ -43,7 +46,6 @@ export const corsPlugin = fp(async (app: FastifyInstance) => {
     },
     credentials: true,  // Required for cookies
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-ID', 'Authorization'],
     exposedHeaders: ['X-Request-ID'],
     maxAge: 86400,
   })

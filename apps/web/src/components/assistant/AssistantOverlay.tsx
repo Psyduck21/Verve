@@ -54,6 +54,7 @@ export function AssistantOverlay({ open, onClose, enabled = false }: AssistantOv
     const [isExecuting, setIsExecuting] = useState(false)
     const [editingPlanId, setEditingPlanId] = useState<string | null>(null)
     const [editedActions, setEditedActions] = useState<any[]>([])
+    const [conflictToResolve, setConflictToResolve] = useState<any | null>(null)
     const bottomRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const { data: tasks = [] } = useTasks()
@@ -165,6 +166,22 @@ export function AssistantOverlay({ open, onClose, enabled = false }: AssistantOv
             ])
         } finally {
             setIsExecuting(false)
+        }
+    }
+
+    const confirmConflictResolution = async () => {
+        if (!conflictToResolve) return
+        setIsExecuting(true)
+        try {
+            const res = await apiClient.ai.assistantExecute("resolve_conflict", [conflictToResolve])
+            if (res.success) {
+                setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", content: `Successfully resolved conflict. Task moved to new time.`, ts: new Date() }])
+            }
+        } catch (error: any) {
+            setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", content: "Failed to resolve conflict: " + error.message, ts: new Date() }])
+        } finally {
+            setIsExecuting(false)
+            setConflictToResolve(null)
         }
     }
 
@@ -428,6 +445,14 @@ export function AssistantOverlay({ open, onClose, enabled = false }: AssistantOv
                                                                             </div>
                                                                         )}
                                                                     </>
+                                                                ) : action.type === 'RESOLVE_CONFLICT' ? (
+                                                                    <>
+                                                                        <div className="font-medium text-amber-500">Conflict Detected</div>
+                                                                        <div className="text-muted-foreground">{action.payload?.title || action.title}</div>
+                                                                        <motion.button whileTap={{ scale: 0.95 }} onClick={() => setConflictToResolve(action)} className="mt-1.5 px-3 py-1.5 text-xs font-bold text-amber-500 hover:text-amber-600 bg-amber-500/10 hover:bg-amber-500/20 rounded-md transition-colors w-fit">
+                                                                            Resolve Conflict
+                                                                        </motion.button>
+                                                                    </>
                                                                 ) : (
                                                                     <>
                                                                         <div className="font-medium text-foreground">{action.title}</div>
@@ -534,6 +559,39 @@ export function AssistantOverlay({ open, onClose, enabled = false }: AssistantOv
                         </div>
                     </motion.aside>
                 </>
+            )}
+
+            {/* Conflict Resolution Overlay */}
+            {conflictToResolve && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setConflictToResolve(null)} />
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-card border border-border shadow-island-lg p-6 rounded-xl w-[400px] max-w-[90vw] z-[61]">
+                        <h3 className="text-lg font-bold text-foreground mb-4">Resolve Conflict</h3>
+                        <div className="space-y-4 mb-6">
+                            <div>
+                                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Task</div>
+                                <div className="font-medium text-foreground">{conflictToResolve.payload?.title || conflictToResolve.title}</div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                                    <div className="text-[10px] font-bold text-destructive mb-1 uppercase tracking-wider">Old Time</div>
+                                    <div className="font-bold text-destructive/90">{conflictToResolve.payload?.old_scheduled_at ? new Date(conflictToResolve.payload.old_scheduled_at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Unknown'}</div>
+                                </div>
+                                <div className="p-3 rounded-lg bg-[hsl(var(--status-done)/0.1)] border border-[hsl(var(--status-done)/0.2)]">
+                                    <div className="text-[10px] font-bold text-[hsl(var(--status-done))] mb-1 uppercase tracking-wider">New Time</div>
+                                    <div className="font-bold text-[hsl(var(--status-done))]">{conflictToResolve.payload?.new_scheduled_at ? new Date(conflictToResolve.payload.new_scheduled_at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'Unknown'}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                            <button onClick={() => setConflictToResolve(null)} className="px-4 py-2 rounded-lg text-sm font-bold text-muted-foreground hover:bg-muted transition-colors border border-border">Cancel</button>
+                            <button onClick={confirmConflictResolution} disabled={isExecuting} className="px-4 py-2 rounded-lg text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2">
+                                {isExecuting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                Confirm Change
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
             )}
         </AnimatePresence>
     )

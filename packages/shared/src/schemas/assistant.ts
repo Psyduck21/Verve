@@ -19,6 +19,9 @@ export const AssistantActionPayloadSchema = z.object({
   category: z.string().max(100).optional(),
   routine_title: z.string().max(200).optional(),
   routine_goal: z.string().max(500).optional(),
+  old_scheduled_at: z.string().datetime({ offset: true }).optional(),
+  new_scheduled_at: z.string().datetime({ offset: true }).optional(),
+  recurrence_rule: z.string().optional(),
 })
 
 export const AssistantPlanActionSchema = z.object({

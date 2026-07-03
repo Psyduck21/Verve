@@ -6,7 +6,6 @@ import { useTasks } from "@/hooks/useTasks"
 import { BoardSkeleton } from "@/components/tasks/BoardSkeleton"
 import { TaskListView } from "@/components/tasks/TaskListView"
 import { TasksActionBar } from "@/components/tasks/TasksActionBar"
-import { TasksOverviewMetrics } from "@/components/tasks/TasksOverviewMetrics"
 
 import { useTaskStore } from "@/store/useTaskStore"
 import { useQuery } from "@tanstack/react-query"
@@ -73,9 +72,6 @@ export default function TasksView() {
                         sortByPriority={sortByPriority}
                         setSortByPriority={setSortByPriority}
                     />
-                    
-                    {!isLoading && <TasksOverviewMetrics tasks={filteredTasks} />}
-
                     {isLoading ? (
                         <BoardSkeleton />
                     ) : (

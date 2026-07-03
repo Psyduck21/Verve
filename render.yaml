@@ -28,3 +28,12 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
+
+  - type: cron
+    name: verve-keep-alive
+    runtime: image
+    image: curlimages/curl
+    plan: free
+    region: singapore
+    schedule: "*/14 * * * *"
+    startCommand: "curl -s https://verve-backend-4o63.onrender.com/health"

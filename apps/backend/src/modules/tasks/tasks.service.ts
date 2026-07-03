@@ -1,6 +1,6 @@
 import { db } from '../../lib/db'
-import { tasks, routines, tombstones, taskRecurrences, taskExternalMetadata } from '@verve/db'
-import { eq, and, desc } from '@verve/db'
+import { tasks, routines, tombstones, taskRecurrences, taskExternalMetadata, notificationSchedules, webPushSubscriptions, taskCompletions } from '@verve/db'
+import { eq, and, desc, isNull } from '@verve/db'
 import { z } from 'zod'
 import { redis, RedisKeys } from '../../lib/redis'
 import { realtimeService } from '../../lib/realtime'
@@ -25,6 +25,31 @@ export class TasksService {
     )
 
     await Promise.all([...uniqueKeys].map((key) => redis.del(key)))
+  }
+
+  private static async syncNotifications(tx: any, userId: string, taskId: string, taskTitle: string, scheduledAt: Date | null) {
+    // Delete existing un-sent notifications for this task
+    await tx.delete(notificationSchedules)
+      .where(and(eq(notificationSchedules.task_id, taskId), isNull(notificationSchedules.sent_at)))
+      
+    if (!scheduledAt) return;
+    
+    // Check if the scheduled time is in the future
+    const notifyTime = new Date(scheduledAt.getTime() - 15 * 60000)
+    if (notifyTime <= new Date()) return;
+    
+    const subs = await tx.select().from(webPushSubscriptions).where(and(eq(webPushSubscriptions.user_id, userId), eq(webPushSubscriptions.active, true)))
+    
+    if (subs.length === 0) return;
+
+    await tx.insert(notificationSchedules).values(subs.map((sub: any) => ({
+      user_id: userId,
+      task_id: taskId,
+      subscription_id: sub.id,
+      scheduled_for: notifyTime,
+      title: 'Upcoming Task',
+      body: `"${taskTitle}" starts in 15 minutes.`,
+    })))
   }
 
   static async createTask(userId: string, taskData: any) {
@@ -94,6 +119,8 @@ export class TasksService {
           source_metadata
         })
       }
+
+      await TasksService.syncNotifications(tx, userId, createdTask.id, createdTask.title, createdTask.scheduled_at)
 
       return createdTask
     })
@@ -192,6 +219,37 @@ export class TasksService {
         }
       }
 
+      if (updatedTask.status === 'completed' || updatedTask.status === 'cancelled') {
+        await tx.delete(notificationSchedules).where(and(eq(notificationSchedules.task_id, taskId), isNull(notificationSchedules.sent_at)))
+      } else {
+        await TasksService.syncNotifications(tx, userId, updatedTask.id, updatedTask.title, updatedTask.scheduled_at)
+      }
+
+      if (coreUpdates.status === 'completed') {
+        const scheduledAt = updatedTask.scheduled_at || new Date()
+        const estimated = updatedTask.estimated_duration_minutes || 30
+        const actual = coreUpdates.actual_duration_minutes || estimated
+        const diffMs = new Date().getTime() - scheduledAt.getTime()
+        const varianceMins = Math.round(diffMs / 60000)
+        
+        await tx.insert(taskCompletions).values({
+          task_id: taskId,
+          user_id: userId,
+          routine_id: updatedTask.routine_id as string,
+          status: 'completed',
+          completed_at: new Date(),
+          actual_duration_minutes: actual,
+          was_on_time: varianceMins <= 15,
+          minutes_variance: varianceMins,
+          scheduled_at: scheduledAt,
+          day_of_week: scheduledAt.getDay(),
+          week_number: 1, // simplified for now
+          hour_of_day: scheduledAt.getHours(),
+          priority: updatedTask.priority,
+          category: updatedTask.category
+        }).onConflictDoNothing()
+      }
+
       return updatedTask
     })
 
@@ -217,6 +275,7 @@ export class TasksService {
           record_id: taskId,
           deleted_by_session_id: null
         })
+        await tx.delete(notificationSchedules).where(and(eq(notificationSchedules.task_id, taskId), isNull(notificationSchedules.sent_at)))
       }
       return deleted
     })

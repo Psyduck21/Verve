@@ -19,6 +19,7 @@ const CreateActionSchema = z.object({
   new_priority:         TaskPrioritySchema.optional(),
   description:          z.string().min(1).max(500),
   category:             z.string().min(1).max(100),
+  recurrence_rule:      z.string().optional(),
 })
 
 const MoveActionSchema = z.object({
@@ -159,6 +160,7 @@ export const ParseTaskSchema = z.object({
   scheduled_at: ISOString.nullable().optional().describe("ISO-8601 timestamp for when the task is scheduled. Return null if no time is specified."),
   priority: TaskPrioritySchema.optional().default('medium').describe("Inferred priority. Default to 'medium' if unspecified."),
   category: z.string().optional().default('personal').describe("Inferred category from the text, e.g. 'work' or 'personal' or 'health' or 'learning'."),
+  recurrence_rule: z.string().optional().describe("If the task repeats (e.g., 'daily', 'every monday'), return an RRule string (e.g., 'FREQ=DAILY', 'FREQ=WEEKLY;BYDAY=MO')."),
 })
 
 export const ParseTaskRequestSchema = z.object({

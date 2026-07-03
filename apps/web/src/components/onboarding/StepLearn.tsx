@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Keyboard, Command, Zap, Check } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useTaskStore } from "@/store/useTaskStore"
 
 const SHORTCUTS = [
   { key: "Cmd/Ctrl + K", description: "Open command palette", icon: Command },
@@ -20,29 +21,43 @@ export function StepLearn() {
   const [activeTab, setActiveTab] = useState<"shortcuts" | "ai">("shortcuts")
   const [completedShortcuts, setCompletedShortcuts] = useState<Set<number>>(new Set())
   const [completedAI, setCompletedAI] = useState<Set<number>>(new Set())
+  const { openModal } = useTaskStore()
 
-  const toggleShortcut = (index: number) => {
-    setCompletedShortcuts(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(index)) {
-        newSet.delete(index)
-      } else {
-        newSet.add(index)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        setCompletedShortcuts(prev => new Set(prev).add(0))
+        return
       }
-      return newSet
-    })
+      
+      const isInput = document.activeElement?.tagName === "INPUT" ||
+                      document.activeElement?.tagName === "TEXTAREA" ||
+                      (document.activeElement as HTMLElement)?.isContentEditable
+                      
+      if (!isInput) {
+        if (e.key === '/') {
+          setCompletedShortcuts(prev => new Set(prev).add(1))
+        } else if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+          setCompletedShortcuts(prev => new Set(prev).add(2))
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  const handleShortcutClick = (index: number) => {
+    // We optionally leave this doing nothing, or just show a small toast, but user asked to mark done on press instead of clicks.
+    // So we don't toggle it on click anymore.
   }
 
-  const toggleAI = (index: number) => {
+  const handleAIClick = (index: number) => {
     setCompletedAI(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(index)) {
-        newSet.delete(index)
-      } else {
-        newSet.add(index)
-      }
+      newSet.add(index)
       return newSet
     })
+    openModal('ai')
   }
 
   const totalCompleted = completedShortcuts.size + completedAI.size
@@ -104,7 +119,7 @@ export function StepLearn() {
               return (
                 <motion.button
                   key={index}
-                  onClick={() => toggleShortcut(index)}
+                  onClick={() => handleShortcutClick(index)}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
@@ -157,7 +172,7 @@ export function StepLearn() {
               return (
                 <motion.button
                   key={index}
-                  onClick={() => toggleAI(index)}
+                  onClick={() => handleAIClick(index)}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}

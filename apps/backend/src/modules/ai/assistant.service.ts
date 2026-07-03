@@ -103,7 +103,7 @@ CRITICAL RULES:
 2. If you cannot find a matching task_id for a task mentioned in the user's request, use CREATE_TASK instead or ask for clarification.
 3. ALWAYS prefer rescheduling (SCHEDULE_TASK) over deleting. Do not generate deletion actions.
 4. NEVER attempt to UPDATE or SCHEDULE tasks marked as [TIME-LOCKED]. These are external calendar events (e.g., Google Calendar) that cannot be modified. Skip them or work around them.
-5. When rescheduling, provide a specific scheduled_at time (ISO format) in the payload.
+5. When rescheduling (SCHEDULE_TASK), provide a specific scheduled_at time (ISO format) in the payload. For RESOLVE_CONFLICT, you MUST include task_id, old_scheduled_at, and new_scheduled_at in the payload.
 6. Use the user's current tasks, memories, conversation history, and calendar state analysis for contextual awareness.
 7. Do not include any fields outside the specified schema.`
 
@@ -264,6 +264,7 @@ CRITICAL RULES:
               estimated_duration_minutes: action.payload?.estimated_duration_minutes,
               scheduled_at: action.payload?.scheduled_at,
               routine_id: action.payload?.routine_id || currentRoutineId,
+              recurrence_rule: action.payload?.recurrence_rule,
             }
             const createdTask = await TasksService.createTask(userId, taskPayload)
             results.push({ action: action.type, success: true, message: `Created task ${createdTask.title}` })
@@ -275,6 +276,7 @@ CRITICAL RULES:
             }
             const updatedTask = await TasksService.updateTask(userId, action.payload.task_id, {
               scheduled_at: action.payload.scheduled_at,
+              recurrence_rule: action.payload?.recurrence_rule,
             })
             results.push({ action: action.type, success: true, message: `Scheduled task ${updatedTask.title}` })
             break
@@ -290,12 +292,19 @@ CRITICAL RULES:
             if (action.payload.category) updates.category = action.payload.category
             if (action.payload.scheduled_at) updates.scheduled_at = action.payload.scheduled_at
             if (action.payload.estimated_duration_minutes) updates.estimated_duration_minutes = action.payload.estimated_duration_minutes
+            if (action.payload.recurrence_rule) updates.recurrence_rule = action.payload.recurrence_rule
             const updatedTask = await TasksService.updateTask(userId, action.payload.task_id, updates)
             results.push({ action: action.type, success: true, message: `Updated task ${updatedTask.title}` })
             break
           }
           case 'RESOLVE_CONFLICT': {
-            results.push({ action: action.type, success: true, message: 'Conflict resolution is acknowledged. No automatic action taken in this MVP.' })
+            if (!action.payload?.task_id || !action.payload?.new_scheduled_at) {
+              throw new Error('Missing task_id or new_scheduled_at for RESOLVE_CONFLICT')
+            }
+            const updatedTask = await TasksService.updateTask(userId, action.payload.task_id, {
+              scheduled_at: action.payload.new_scheduled_at,
+            })
+            results.push({ action: action.type, success: true, message: `Resolved conflict for task ${updatedTask.title}` })
             break
           }
           default: {

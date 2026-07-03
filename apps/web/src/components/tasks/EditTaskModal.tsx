@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Type, AlignLeft, AlertCircle, Tag, Clock, CornerDownLeft, Save, X, ArrowUp, ArrowDown, Calendar, CheckCircle } from "lucide-react"
+import { Type, AlignLeft, AlertCircle, Tag, Clock, CornerDownLeft, Save, X, ArrowUp, ArrowDown, Calendar, CheckCircle, Repeat } from "lucide-react"
 import { format } from "date-fns"
 import { useUpdateTask } from "@/hooks/useTasks"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -22,6 +22,12 @@ interface EditTaskModalProps {
 const PRIORITIES = ["critical", "high", "medium", "low"]
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240, 480]
 const STATUS_OPTIONS = ["not_started", "in_progress", "completed", "missed", "cancelled"]
+const RECURRENCE_OPTIONS = [
+    { label: "None", value: "" },
+    { label: "Daily", value: "FREQ=DAILY" },
+    { label: "Weekdays", value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
+    { label: "Weekly", value: "FREQ=WEEKLY" }
+]
 
 const formatDuration = (mins: number) => {
     if (mins < 60) return `${mins}m`
@@ -86,6 +92,7 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
         { id: 'scheduled_at', label: 'Start Time', icon: Calendar, value: editedTask?.scheduled_at ? format(new Date(editedTask.scheduled_at), "MMM d, yyyy h:mm a") : 'Not scheduled' },
         { id: 'duration', label: 'Duration', icon: Clock, value: formatDuration(editedTask?.estimated_duration_minutes || 30) },
         { id: 'status', label: 'Status', icon: CheckCircle, value: editedTask?.status || 'not_started' },
+        { id: 'recurrence_rule', label: 'Repeat', icon: Repeat, value: RECURRENCE_OPTIONS.find(o => o.value === (editedTask?.recurrence_rule || ''))?.label || 'None' },
     ]
 
     const currentField = fields[focusedFieldIdx]
@@ -95,6 +102,7 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
     else if (currentField?.id === 'category') currentOptions = displayCategories.map((c: any) => c.name)
     else if (currentField?.id === 'duration') currentOptions = DURATIONS.map(d => d.toString())
     else if (currentField?.id === 'status') currentOptions = STATUS_OPTIONS
+    else if (currentField?.id === 'recurrence_rule') currentOptions = RECURRENCE_OPTIONS.map(o => o.label)
 
     const filteredOptions = currentOptions.filter(o => o.toLowerCase().includes(editValue.toLowerCase()))
     const safeDropdownFocusIdx = Math.min(dropdownFocusIdx, Math.max(0, filteredOptions.length - 1))
@@ -102,10 +110,15 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
     const saveOption = (opt: string) => {
         setEditValue(opt)
         setTimeout(() => {
+            let val: any = opt;
+            if (currentField.id === 'duration') val = parseInt(opt);
+            else if (currentField.id === 'recurrence_rule') {
+                val = RECURRENCE_OPTIONS.find(o => o.label === opt)?.value || null;
+            }
+            
             setEditedTask((prev: any) => ({ 
                 ...prev, 
-                [currentField.id === 'duration' ? 'estimated_duration_minutes' : currentField.id]: 
-                    currentField.id === 'duration' ? parseInt(opt) : opt 
+                [currentField.id === 'duration' ? 'estimated_duration_minutes' : currentField.id]: val 
             }))
             setIsEditing(false)
             setTimeout(() => modalRef.current?.focus(), 50)
@@ -190,6 +203,8 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
         } else if (field === 'scheduled_at') {
             // editValue is from datetime-local input
             val = editValue ? new Date(editValue).toISOString() : null
+        } else if (field === 'recurrence_rule') {
+            val = RECURRENCE_OPTIONS.find(o => o.label.toLowerCase() === editValue.toLowerCase())?.value || null;
         }
 
         setEditedTask((prev: any) => ({ ...prev, [field === 'duration' ? 'estimated_duration_minutes' : field]: val }))
@@ -208,6 +223,7 @@ export function EditTaskModal({ open, onClose, task }: EditTaskModalProps) {
             category: editedTask.category,
             estimated_duration_minutes: editedTask.estimated_duration_minutes,
             status: editedTask.status,
+            recurrence_rule: editedTask.recurrence_rule,
         }, {
             onSuccess: handleClose
         })

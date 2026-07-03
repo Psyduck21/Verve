@@ -18,7 +18,12 @@ const UpdatePreferencesSchema = z.object({
   locale: z.string().optional(),
   grind_type: z.string().optional(),
   onboarding_completed: z.boolean().optional(),
-  preferences: z.any().optional()
+  preferences: z.any().optional(),
+  wake_time: z.string().optional(),
+  sleep_time: z.string().optional(),
+  daily_commitment_minutes: z.number().optional(),
+  primary_focus_areas: z.array(z.string()).optional(),
+  priority_preference: z.string().optional(),
 })
 
 const WebhookSchema = z.object({

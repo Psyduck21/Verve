@@ -53,6 +53,7 @@ import authPlugin from './plugins/auth.plugin'
 import csrfPlugin from './plugins/csrf.plugin'
 import { auditPlugin } from './plugins/audit.plugin'
 import { notificationWorkerPlugin } from './plugins/notification-worker.plugin'
+import { recurrenceWorkerPlugin } from './plugins/recurrence-worker.plugin'
 import { db } from './lib/db'
 import { redis } from './lib/redis'
 import { sql } from '@verve/db'
@@ -113,6 +114,7 @@ async function bootstrap() {
   await app.register(authPlugin)
   await app.register(auditPlugin)
   await app.register(notificationWorkerPlugin)
+  await app.register(recurrenceWorkerPlugin)
 
   // ── Swagger API Documentation ─────────────────────────────
   await app.register(swagger, {

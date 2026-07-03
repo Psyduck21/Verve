@@ -10,7 +10,8 @@ import {
     Mail,
     Video,
     CreditCard,
-    Sparkles
+    Sparkles,
+    Repeat
 } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import { cn } from "@/lib/utils"
@@ -21,6 +22,8 @@ import { useListNavigation } from "@/hooks/useListNavigation"
 import { useTasks, useUpdateTask, useDeleteTask } from "@/hooks/useTasks"
 import { useTaskStore } from "@/store/useTaskStore"
 import { apiClient } from "@/utils/apiClient"
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
+import { AIConfirmModal } from "../layout/AIConfirmModal"
 
 const STATS_ICONS = {
     tasksCompleted: { icon: CheckCircle2, colorClass: "text-green-500", gradientClass: "gradient-green" },
@@ -39,7 +42,7 @@ export function DashboardContent({ user }: { user?: any }) {
     const isNewTaskOpen = useTaskStore(state => state.isTaskModalOpen)
     const [editTask, setEditTask] = useState<any | null>(null)
 
-    const { mutate: updateTask } = useUpdateTask()
+    const { mutate: updateTask, mutateAsync: updateTaskAsync } = useUpdateTask()
     const { mutate: deleteTask } = useDeleteTask()
     const [todaysTasks, setTodaysTasks] = useState<any[]>([])
 
@@ -117,13 +120,17 @@ export function DashboardContent({ user }: { user?: any }) {
         setSuggestions(prev => prev.filter(s => s.id !== id))
     }
 
+    const [aiPlanToConfirm, setAiPlanToConfirm] = useState<any[] | null>(null)
+    const [isConfirmingAIPlan, setIsConfirmingAIPlan] = useState(false)
+    const [confirmingSuggestionId, setConfirmingSuggestionId] = useState<string | null>(null)
+
     const executeSuggestion = async (id: string, text: string) => {
         setLoadingId(id)
         try {
-            // Trigger Fastify AI engine to process the suggestion context
             const res = await apiClient.ai.rescheduleTasks(text, todaysTasks)
-            if (res.success) {
-                dismissSuggestion(id)
+            if (res.success && res.data) {
+                setAiPlanToConfirm(res.data)
+                setConfirmingSuggestionId(id)
             }
         } catch (error) {
             console.error("AI execution failed:", error)
@@ -132,11 +139,51 @@ export function DashboardContent({ user }: { user?: any }) {
         }
     }
 
+    const handleConfirmAIPlan = async () => {
+        if (!aiPlanToConfirm) return
+        setIsConfirmingAIPlan(true)
+        try {
+            await Promise.all(aiPlanToConfirm.map(async (action: any) => {
+                if ((action.action === "MOVE" || action.action === "UPDATE") && action.task_id) {
+                    const updates: any = { id: action.task_id }
+                    if (action.new_scheduled_at) updates.scheduled_at = action.new_scheduled_at
+                    if (action.new_title) updates.title = action.new_title
+                    if (action.new_priority) updates.priority = action.new_priority
+                    if (action.new_duration_minutes) updates.estimated_duration_minutes = action.new_duration_minutes
+                    await updateTaskAsync(updates)
+                }
+            }))
+            if (confirmingSuggestionId) {
+                dismissSuggestion(confirmingSuggestionId)
+            }
+        } catch (error) {
+            console.error("Error executing AI plan:", error)
+        } finally {
+            setIsConfirmingAIPlan(false)
+            setAiPlanToConfirm(null)
+            setConfirmingSuggestionId(null)
+        }
+    }
+
     const liveStats = [
         { title: "Tasks Completed", value: stats?.tasksCompleted || "0", trend: "0", ...STATS_ICONS.tasksCompleted },
         { title: "Focus Time", value: stats?.focusTimeMinutes ? `${Math.round(stats.focusTimeMinutes / 60)}h ${stats.focusTimeMinutes % 60}m` : "0h", trend: "0h", ...STATS_ICONS.focusTime },
         { title: "Meetings", value: stats?.meetings || "0", trend: "0", ...STATS_ICONS.meetings },
     ]
+
+    const pieData = useMemo(() => {
+        const completed = todaysTasks.filter(t => t.status === 'completed').length
+        const inProgress = todaysTasks.filter(t => t.status === 'in_progress').length
+        const missed = todaysTasks.filter(t => t.status === 'missed').length
+        const notStarted = todaysTasks.filter(t => t.status === 'not_started').length
+
+        return [
+            { name: 'Completed', value: completed, color: '#10b981' },
+            { name: 'In Progress', value: inProgress, color: '#3b82f6' },
+            { name: 'Missed', value: missed, color: '#ef4444' },
+            { name: 'To Do', value: notStarted, color: '#8b5cf6' },
+        ].filter(d => d.value > 0)
+    }, [todaysTasks])
 
     return (
         <div className="flex flex-col h-full w-full bg-transparent" data-purpose="dashboard-page">
@@ -174,9 +221,9 @@ export function DashboardContent({ user }: { user?: any }) {
                             ))}
                         </section>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* ── Main Column: Today's Plan & Conflicts ── */}
-                            <div className="space-y-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* ── Main Column: Today's Plan ── */}
+                            <div className="space-y-6 lg:col-span-1">
 
                                 {/* Today's Plan */}
                                 <div className="space-y-4">
@@ -228,8 +275,16 @@ export function DashboardContent({ user }: { user?: any }) {
                                                             {item.estimated_duration_minutes} mins
                                                         </p>
                                                     </div>
-                                                    <div className="text-xs font-bold text-muted-foreground whitespace-nowrap">
-                                                        {item.scheduled_at ? new Date(item.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No time'}
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <div className="text-xs font-bold text-muted-foreground whitespace-nowrap">
+                                                            {item.scheduled_at ? new Date(item.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No time'}
+                                                        </div>
+                                                        {item.recurrence_rule && (
+                                                            <div className="flex items-center text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                                                                <Icon icon={Repeat} size="sm" className="w-3 h-3 mr-1" />
+                                                                <span className="sr-only">Recurring</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))
@@ -239,7 +294,7 @@ export function DashboardContent({ user }: { user?: any }) {
                             </div>
 
                             {/* ── Side Column: AI Suggestions ── */}
-                            <div className="space-y-4">
+                            <div className="space-y-4 lg:col-span-1">
                                 <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                                     <Icon icon={Sparkles} size="sm" className="text-primary" />
                                     AI Suggestions
@@ -281,6 +336,43 @@ export function DashboardContent({ user }: { user?: any }) {
                                     )}
                                 </div>
                             </div>
+
+                            {/* ── Side Column: Analytics ── */}
+                            <div className="space-y-4 lg:col-span-1">
+                                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                                    <Icon icon={CheckCircle2} size="sm" className="text-primary" />
+                                    Today's Status
+                                </h2>
+                                <div className="p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col items-center justify-center min-h-[300px]">
+                                    {pieData.length > 0 ? (
+                                        <div className="w-full h-64">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie
+                                                        data={pieData}
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={60}
+                                                        outerRadius={80}
+                                                        paddingAngle={5}
+                                                        dataKey="value"
+                                                    >
+                                                        {pieData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                                        ))}
+                                                    </Pie>
+                                                    <Tooltip
+                                                        contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }}
+                                                        itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                                                    />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm font-medium text-muted-foreground text-center">No tasks to display.</p>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                     </div>
@@ -293,6 +385,17 @@ export function DashboardContent({ user }: { user?: any }) {
                 task={editTask}
             />
 
+            <AIConfirmModal
+                open={!!aiPlanToConfirm}
+                actions={aiPlanToConfirm || []}
+                tasks={todaysTasks}
+                isSubmitting={isConfirmingAIPlan}
+                onConfirm={handleConfirmAIPlan}
+                onClose={() => {
+                    setAiPlanToConfirm(null)
+                    setConfirmingSuggestionId(null)
+                }}
+            />
         </div>
     )
 }

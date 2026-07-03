@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { motion } from "framer-motion"
 import { format } from "date-fns"
-import { Calendar, AlignLeft, GripVertical, CheckCircle2, MoreHorizontal, ListTodo, Check, Lock } from "lucide-react"
+import { Calendar, AlignLeft, GripVertical, CheckCircle2, MoreHorizontal, ListTodo, Check, Lock, Repeat } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import type { Task } from "@/hooks/useTasks"
 import { cn } from "@/lib/utils"
@@ -168,9 +168,17 @@ export function TaskCard({ task, isOverlay, isFocused, isSelected, onClick }: Ta
             {/* Bottom Row */}
             <div className="flex items-center justify-between pl-5 mt-0.5">
                 {task.scheduled_at ? (
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
-                        <Icon icon={Calendar} size="sm" className="w-3 h-3 opacity-70" />
-                        {format(new Date(task.scheduled_at), "MMM d, h:mm a")}
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
+                            <Icon icon={Calendar} size="sm" className="w-3 h-3 opacity-70" />
+                            {format(new Date(task.scheduled_at), "MMM d, h:mm a")}
+                        </div>
+                        {task.recurrence_rule && (
+                            <div className="flex items-center text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                                <Icon icon={Repeat} size="sm" className="w-3 h-3 mr-1" />
+                                <span className="sr-only">Recurring</span>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div />

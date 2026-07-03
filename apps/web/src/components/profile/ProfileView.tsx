@@ -18,24 +18,35 @@ export default function ProfileView() {
         name: "",
         email: "",
         role: "",
+        wakeTime: "",
+        sleepTime: "",
+        dailyCommitment: 120,
+        focusAreas: "",
+        priorityPref: "",
         aiUsed: 0,
         aiLimit: 0,
     })
 
     useEffect(() => {
         if (userProfileData?.data) {
+            const data = userProfileData.data
             setProfile({
-                name: userProfileData.data.full_name || "",
-                email: userProfileData.data.email || "",
-                role: userProfileData.data.grind_type || "",
-                aiUsed: userProfileData.data.ai_requests_used_today || 0,
-                aiLimit: userProfileData.data.ai_request_limit || 50,
+                name: data.full_name || "",
+                email: data.email || "",
+                role: data.grind_type || "",
+                wakeTime: data.wake_time || "09:00:00",
+                sleepTime: data.sleep_time || "22:00:00",
+                dailyCommitment: data.daily_commitment_minutes || 120,
+                focusAreas: Array.isArray(data.primary_focus_areas) ? data.primary_focus_areas.join(", ") : "",
+                priorityPref: data.priority_preference || "balanced",
+                aiUsed: data.ai_requests_used_today || 0,
+                aiLimit: data.ai_request_limit || 50,
             })
         }
     }, [userProfileData])
 
     const updateProfileMutation = useMutation({
-        mutationFn: async (newProfile: { full_name: string, grind_type: string }) => {
+        mutationFn: async (newProfile: any) => {
             return apiClient.users.updatePreferences(newProfile)
         },
         onSuccess: () => {
@@ -47,7 +58,12 @@ export default function ProfileView() {
     const handleSaveProfile = () => {
         updateProfileMutation.mutate({
             full_name: profile.name,
-            grind_type: profile.role
+            grind_type: profile.role,
+            wake_time: profile.wakeTime.length === 5 ? `${profile.wakeTime}:00` : profile.wakeTime,
+            sleep_time: profile.sleepTime.length === 5 ? `${profile.sleepTime}:00` : profile.sleepTime,
+            daily_commitment_minutes: Number(profile.dailyCommitment),
+            primary_focus_areas: profile.focusAreas.split(",").map(s => s.trim()).filter(Boolean),
+            priority_preference: profile.priorityPref
         })
     }
 
@@ -120,7 +136,7 @@ export default function ProfileView() {
                             </div>
 
                             <div className="grid gap-2">
-                                <label className="text-sm font-medium text-foreground">Role</label>
+                                <label className="text-sm font-medium text-foreground">Grind Type (Role)</label>
                                 {isLoading ? (
                                     <Skeleton className="h-9 w-full rounded-lg" />
                                 ) : (
@@ -130,6 +146,83 @@ export default function ProfileView() {
                                         onChange={(e) => setProfile({ ...profile, role: e.target.value })}
                                         className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                     />
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <label className="text-sm font-medium text-foreground">Wake Time</label>
+                                    {isLoading ? (
+                                        <Skeleton className="h-9 w-full rounded-lg" />
+                                    ) : (
+                                        <input
+                                            type="time"
+                                            value={profile.wakeTime.substring(0,5)}
+                                            onChange={(e) => setProfile({ ...profile, wakeTime: e.target.value })}
+                                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                        />
+                                    )}
+                                </div>
+                                <div className="grid gap-2">
+                                    <label className="text-sm font-medium text-foreground">Sleep Time</label>
+                                    {isLoading ? (
+                                        <Skeleton className="h-9 w-full rounded-lg" />
+                                    ) : (
+                                        <input
+                                            type="time"
+                                            value={profile.sleepTime.substring(0,5)}
+                                            onChange={(e) => setProfile({ ...profile, sleepTime: e.target.value })}
+                                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium text-foreground">Daily Commitment (Minutes)</label>
+                                {isLoading ? (
+                                    <Skeleton className="h-9 w-full rounded-lg" />
+                                ) : (
+                                    <input
+                                        type="number"
+                                        min="15"
+                                        step="15"
+                                        value={profile.dailyCommitment}
+                                        onChange={(e) => setProfile({ ...profile, dailyCommitment: Number(e.target.value) })}
+                                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    />
+                                )}
+                            </div>
+
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium text-foreground">Primary Focus Areas</label>
+                                {isLoading ? (
+                                    <Skeleton className="h-9 w-full rounded-lg" />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={profile.focusAreas}
+                                        placeholder="Work, Health, Learning (comma separated)"
+                                        onChange={(e) => setProfile({ ...profile, focusAreas: e.target.value })}
+                                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    />
+                                )}
+                            </div>
+
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium text-foreground">Priority Preference</label>
+                                {isLoading ? (
+                                    <Skeleton className="h-9 w-full rounded-lg" />
+                                ) : (
+                                    <select
+                                        value={profile.priorityPref}
+                                        onChange={(e) => setProfile({ ...profile, priorityPref: e.target.value })}
+                                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
+                                        <option value="balanced">Balanced</option>
+                                        <option value="urgent_first">Urgent First</option>
+                                        <option value="important_first">Important First</option>
+                                    </select>
                                 )}
                             </div>
                         </div>

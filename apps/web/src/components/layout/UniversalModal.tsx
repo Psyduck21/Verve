@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "@/utils/apiClient"
+import { AIConfirmModal } from "./AIConfirmModal"
 import {
     Sparkles, Calendar, Tag, AlertCircle, CornerDownLeft, ArrowUp, ArrowDown,
     Clock, AlignLeft, Lock, Loader2, LayoutDashboard, Settings, Download, LogOut,
@@ -100,6 +101,14 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
     const [cmdSelectedIndex, setCmdSelectedIndex] = useState(0)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [aiMode, setAiMode] = useState(false) // true = natural language omnibox mode
+    const [filteredOptions, setFilteredOptions] = useState<any[]>([])
+    const [dropdownFocusIdx, setDropdownFocusIdx] = useState(0)
+
+    const [aiPlanToConfirm, setAiPlanToConfirm] = useState<any[] | null>(null)
+    const [isConfirmingAIPlan, setIsConfirmingAIPlan] = useState(false)
+
+    // Derived states
+    const isCommand = mode === "command"
     const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null)
 
     const router = useRouter()
@@ -281,42 +290,59 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
 
     const runAICommand = async (command: string) => {
         setIsSubmitting(true)
-        handleClose()
         try {
             const localTimeString = new Date().toString()
             const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
             const res = await apiClient.ai.omnibox(command, tasks, localTimeString, timezone)
             if (res.success && res.data) {
-                await Promise.all(res.data.map(async (action: any) => {
-                    if (action.action === "CREATE") {
-                        await createTaskMutation.mutateAsync({
-                            title: action.new_title,
-                            scheduled_at: action.new_scheduled_at || null,
-                            priority: action.new_priority || "medium",
-                            estimated_duration_minutes: action.new_duration_minutes || 30,
-                            status: "not_started",
-                            description: action.description || action.new_description,
-                            category: action.category || action.new_category,
-                            is_time_locked: action.is_time_locked ?? action.new_is_time_locked ?? false,
-                        })
-                    } else if (action.action === "MOVE" || action.action === "UPDATE") {
-                        if (action.task_id) {
-                            const updates: any = { id: action.task_id }
-                            if (action.new_scheduled_at) updates.scheduled_at = action.new_scheduled_at
-                            if (action.new_title) updates.title = action.new_title
-                            if (action.new_priority) updates.priority = action.new_priority
-                            if (action.new_duration_minutes) updates.estimated_duration_minutes = action.new_duration_minutes
-                            await updateTask.mutateAsync(updates)
-                        }
-                    } else if (action.action === "CANCEL") {
-                        console.warn("AI returned CANCEL action. Skipping cancellation to preserve the task unless user explicitly confirms.")
-                    }
-                }))
+                setAiPlanToConfirm(res.data)
+            } else {
+                handleClose()
             }
         } catch (err) {
             console.error("AI omnibox error:", err)
+            handleClose()
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const handleConfirmAIPlan = async () => {
+        if (!aiPlanToConfirm) return
+        setIsConfirmingAIPlan(true)
+        try {
+            await Promise.all(aiPlanToConfirm.map(async (action: any) => {
+                if (action.action === "CREATE") {
+                    await createTaskMutation.mutateAsync({
+                        title: action.new_title,
+                        scheduled_at: action.new_scheduled_at || null,
+                        priority: action.new_priority || "medium",
+                        estimated_duration_minutes: action.new_duration_minutes || 30,
+                        status: "not_started",
+                        description: action.description || action.new_description,
+                        category: action.category || action.new_category,
+                        is_time_locked: action.is_time_locked ?? action.new_is_time_locked ?? false,
+                        recurrence_rule: action.recurrence_rule,
+                    })
+                } else if (action.action === "MOVE" || action.action === "UPDATE") {
+                    if (action.task_id) {
+                        const updates: any = { id: action.task_id }
+                        if (action.new_scheduled_at) updates.scheduled_at = action.new_scheduled_at
+                        if (action.new_title) updates.title = action.new_title
+                        if (action.new_priority) updates.priority = action.new_priority
+                        if (action.new_duration_minutes) updates.estimated_duration_minutes = action.new_duration_minutes
+                        await updateTask.mutateAsync(updates)
+                    }
+                } else if (action.action === "CANCEL") {
+                    console.warn("AI returned CANCEL action. Skipping cancellation to preserve the task unless user explicitly confirms.")
+                }
+            }))
+            handleClose()
+        } catch (error) {
+            console.error("Error executing AI plan:", error)
+        } finally {
+            setIsConfirmingAIPlan(false)
+            setAiPlanToConfirm(null)
         }
     }
 
@@ -348,6 +374,7 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
                 description: parsed.description || undefined,
                 routine_id: effectiveRoutineId,
                 is_time_locked: parsed.isTimeLocked || false,
+                recurrence_rule: aiParsed.recurrence_rule,
             }, { onSuccess: handleClose, onError: (err) => { setIsSubmitting(false); alert("Failed: " + err.message) } })
         } catch {
             const parsed = parseInput(input)
@@ -714,6 +741,18 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
                     </motion.div>
                 </div>
             )}
+            
+            <AIConfirmModal
+                open={!!aiPlanToConfirm}
+                actions={aiPlanToConfirm || []}
+                tasks={tasks}
+                isSubmitting={isConfirmingAIPlan}
+                onConfirm={handleConfirmAIPlan}
+                onClose={() => {
+                    setAiPlanToConfirm(null)
+                    handleClose()
+                }}
+            />
         </AnimatePresence>
     )
 }
