@@ -146,7 +146,7 @@ async function bootstrap() {
   })
 
   // ── Health check (no auth) ────────────────────────────────
-  app.get('/health', async () => ({
+  app.get('/health', { logLevel: 'warn' }, async () => ({
     status: 'ok',
     service: 'verve-backend',
     timestamp: new Date().toISOString(),
@@ -162,7 +162,7 @@ async function bootstrap() {
     })
 
   // ── Comprehensive health check with dependencies ─────────────
-  app.get('/health/detailed', async (request, reply) => {
+  app.get('/health/detailed', { logLevel: 'warn' }, async (request, reply) => {
     const health = {
       status: 'ok' as 'ok' | 'degraded' | 'down',
       service: 'verve-backend',

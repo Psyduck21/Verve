@@ -101,8 +101,6 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
     const [cmdSelectedIndex, setCmdSelectedIndex] = useState(0)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [aiMode, setAiMode] = useState(false) // true = natural language omnibox mode
-    const [filteredOptions, setFilteredOptions] = useState<any[]>([])
-    const [dropdownFocusIdx, setDropdownFocusIdx] = useState(0)
 
     const [aiPlanToConfirm, setAiPlanToConfirm] = useState<any[] | null>(null)
     const [isConfirmingAIPlan, setIsConfirmingAIPlan] = useState(false)

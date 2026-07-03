@@ -36,4 +36,4 @@ services:
     plan: free
     region: singapore
     schedule: "*/14 * * * *"
-    startCommand: "curl -s https://verve-backend-4o63.onrender.com/health"
+    startCommand: "curl -s https://verve-backend-iwzb.onrender.com/health"
