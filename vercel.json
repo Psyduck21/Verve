@@ -1,4 +1,5 @@
 {
+  "regions": ["bom1"],
   "buildCommand": "pnpm --filter=@verve/web build",
   "outputDirectory": ".next",
   "framework": "nextjs",
