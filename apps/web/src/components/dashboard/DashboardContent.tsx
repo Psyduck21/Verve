@@ -185,76 +185,98 @@ export function DashboardContent({ user }: { user?: any }) {
         ].filter(d => d.value > 0)
     }, [todaysTasks])
 
+    const containerVariant: any = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
+    }
+    const itemVariant: any = {
+        hidden: { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    }
+
     return (
         <div className="flex flex-col h-full w-full bg-transparent" data-purpose="dashboard-page">
             <div className="flex flex-1 overflow-hidden">
-                <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col overflow-hidden">
-                    <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-thin">
-                        {/* ── Stats Row ── */}
-                        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {liveStats.map((stat, i) => (
-                                <div
-                                    key={i}
-                                    className={cn(
-                                        "relative p-6 rounded-2xl border border-border shadow-sm bg-card overflow-hidden group",
-                                        stat.gradientClass
-                                    )}
-                                >
-                                    <div className="relative z-10 flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className={cn("p-2.5 rounded-xl bg-muted shadow-sm border border-border", stat.colorClass)}>
-                                                <Icon icon={stat.icon} size="md" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">{stat.title}</p>
-                                                <h3 className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">
-                                                    {isLoadingStats ? <Skeleton className="h-6 w-16" /> : stat.value}
-                                                </h3>
+                <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col overflow-hidden relative">
+                    {/* Background subtle gradients for that premium SaaS feel */}
+                    <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                    <motion.div 
+                        className="flex-1 overflow-y-auto p-8 scrollbar-thin relative z-10"
+                        variants={containerVariant}
+                        initial="hidden"
+                        animate="visible"
+                    >
+                        <div className="max-w-7xl mx-auto space-y-6">
+                            
+                            {/* Welcome Banner */}
+                            <motion.div variants={itemVariant} className="mb-8">
+                                <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+                                    Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {firstName}
+                                </h1>
+                                <p className="text-muted-foreground mt-1">Here is your schedule and focus overview for today.</p>
+                            </motion.div>
+
+                            {/* Main Bento Grid */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 auto-rows-min">
+                                
+                                {/* Stats Row: 3 cards taking 4 cols each */}
+                                {liveStats.map((stat, i) => (
+                                    <motion.div
+                                        variants={itemVariant}
+                                        key={i}
+                                        className="lg:col-span-4 p-6 rounded-[24px] border border-border/50 bg-card shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group"
+                                    >
+                                        <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br", stat.gradientClass)} />
+                                        <div className="relative z-10 flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className={cn("p-3 rounded-2xl bg-muted/50 border border-border/50", stat.colorClass)}>
+                                                    <Icon icon={stat.icon} size="md" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">{stat.title}</p>
+                                                    <h3 className="text-2xl font-black text-foreground tracking-tight mt-1">
+                                                        {isLoadingStats ? <Skeleton className="h-6 w-16" /> : stat.value}
+                                                    </h3>
+                                                </div>
                                             </div>
                                         </div>
-                                        <span className="flex items-center text-xs font-bold text-status-done bg-status-done/10 px-2 py-1 rounded-lg">
-                                            <ArrowUpRight size={12} className="mr-0.5" />
-                                            {stat.trend}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </section>
+                                    </motion.div>
+                                ))}
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* ── Main Column: Today's Plan ── */}
-                            <div className="space-y-6 lg:col-span-1">
-
-                                {/* Today's Plan */}
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
+                                {/* Today's Plan - Spans 8 cols */}
+                                <motion.div variants={itemVariant} className="lg:col-span-8 lg:row-span-2 flex flex-col h-full rounded-[24px] border border-border/50 bg-card shadow-sm overflow-hidden">
+                                    <div className="p-6 border-b border-border/50 flex items-center justify-between bg-muted/20">
                                         <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                            <Icon icon={CalendarIcon} size="sm" className="text-primary" />
+                                            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                                                <Icon icon={CalendarIcon} size="sm" />
+                                            </div>
                                             Today's Plan
                                         </h2>
                                     </div>
-
-                                    <div className="space-y-2">
+                                    <div className="p-6 flex-1 flex flex-col gap-3">
                                         {summaryError ? (
-                                            <div className="p-8 text-center text-destructive font-medium border border-dashed border-destructive/30 bg-destructive/10 rounded-2xl">
+                                            <div className="flex-1 flex items-center justify-center p-8 text-destructive font-medium border border-dashed border-destructive/30 bg-destructive/10 rounded-2xl">
                                                 {summaryError}
                                             </div>
                                         ) : isLoadingStats ? (
-                                            <div className="space-y-2">
+                                            <div className="space-y-3">
                                                 {[1, 2, 3].map((i) => (
-                                                    <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border bg-card border-border">
+                                                    <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-border/50">
                                                         <Skeleton className="h-10 w-10 rounded-xl" />
                                                         <div className="flex-1 space-y-2">
                                                             <Skeleton className="h-4 w-3/4" />
                                                             <Skeleton className="h-3 w-1/4" />
                                                         </div>
-                                                        <Skeleton className="h-4 w-12" />
                                                     </div>
                                                 ))}
                                             </div>
                                         ) : todaysTasks.length === 0 ? (
-                                            <div className="p-8 text-center text-muted-foreground font-medium border border-dashed border-border bg-card rounded-2xl">
-                                                No tasks scheduled for today.
+                                            <div className="flex-1 flex flex-col items-center justify-center p-12 text-muted-foreground border border-dashed border-border/50 rounded-2xl bg-muted/10">
+                                                <CheckCircle2 className="w-12 h-12 mb-4 text-muted-foreground/30" />
+                                                <p className="font-medium">No tasks scheduled for today.</p>
+                                                <p className="text-sm">Enjoy your free time!</p>
                                             </div>
                                         ) : (
                                             todaysTasks.map((item, i) => (
@@ -262,27 +284,32 @@ export function DashboardContent({ user }: { user?: any }) {
                                                     key={item.id}
                                                     onClick={() => setEditTask(item)}
                                                     className={cn(
-                                                        "flex items-center gap-4 p-4 rounded-2xl border bg-card shadow-sm hover:shadow-md hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 group cursor-pointer",
-                                                        i === focusedIndex ? "border-primary ring-2 ring-primary/20" : "border-border"
+                                                        "flex items-center gap-4 p-4 rounded-[20px] border bg-card hover:bg-muted/30 transition-all duration-200 group cursor-pointer",
+                                                        i === focusedIndex ? "border-primary ring-1 ring-primary" : "border-border/50 hover:border-border"
                                                     )}
                                                 >
-                                                    <div className="p-2.5 rounded-xl bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors border border-border">
-                                                        <Icon icon={item.external_provider === 'zoom' ? Video : item.external_provider === 'gmail' ? Mail : CheckCircle2} size="md" />
+                                                    <div className="p-3 rounded-xl bg-muted/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors border border-border/50">
+                                                        <Icon icon={item.external_provider === 'zoom' ? Video : item.external_provider === 'gmail' ? Mail : CheckCircle2} size="sm" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-bold text-foreground truncate">{item.title}</p>
-                                                        <p className="text-xs font-medium text-muted-foreground capitalize">
-                                                            {item.estimated_duration_minutes} mins
-                                                        </p>
+                                                        <p className="text-[15px] font-bold text-foreground truncate">{item.title}</p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="text-xs font-semibold text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md capitalize">
+                                                                {item.category || 'General'}
+                                                            </span>
+                                                            <span className="text-xs font-medium text-muted-foreground">
+                                                                {item.estimated_duration_minutes} mins
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex flex-col items-end gap-1">
-                                                        <div className="text-xs font-bold text-muted-foreground whitespace-nowrap">
+                                                    <div className="flex flex-col items-end gap-1.5">
+                                                        <div className="text-sm font-bold text-foreground">
                                                             {item.scheduled_at ? new Date(item.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No time'}
                                                         </div>
                                                         {item.recurrence_rule && (
-                                                            <div className="flex items-center text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                                                            <div className="flex items-center text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-md">
                                                                 <Icon icon={Repeat} size="sm" className="w-3 h-3 mr-1" />
-                                                                <span className="sr-only">Recurring</span>
+                                                                Recurring
                                                             </div>
                                                         )}
                                                     </div>
@@ -290,92 +317,119 @@ export function DashboardContent({ user }: { user?: any }) {
                                             ))
                                         )}
                                     </div>
-                                </div>
-                            </div>
+                                </motion.div>
 
-                            {/* ── Side Column: AI Suggestions ── */}
-                            <div className="space-y-4 lg:col-span-1">
-                                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                    <Icon icon={Sparkles} size="sm" className="text-primary" />
-                                    AI Suggestions
-                                </h2>
-
-                                <div className="space-y-3">
-                                    {visibleSuggestions.length === 0 ? (
-                                        <div
-                                            className="p-6 text-center border border-dashed border-border bg-card rounded-2xl text-sm font-medium text-muted-foreground"
-                                        >
-                                            You're all caught up!
+                                {/* Sidebar Column (4 cols) */}
+                                <div className="lg:col-span-4 flex flex-col gap-6">
+                                    
+                                    {/* AI Suggestions */}
+                                    <motion.div variants={itemVariant} className="rounded-[24px] border border-primary/20 bg-primary/5 shadow-sm overflow-hidden relative">
+                                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                                            <Sparkles className="w-24 h-24 text-primary" />
                                         </div>
-                                    ) : (
-                                        visibleSuggestions.map((s, i) => (
-                                            <div
-                                                key={s.id}
-                                                className="p-5 rounded-2xl bg-card border border-border shadow-sm relative overflow-hidden"
-                                            >
-                                                <p className="text-sm text-foreground font-medium mb-3 relative z-10 leading-snug">
-                                                    {s.text}
-                                                </p>
-                                                <div className="flex gap-2 relative z-10">
-                                                    <button
-                                                        onClick={() => executeSuggestion(s.id, s.text)}
-                                                        disabled={loadingId === s.id}
-                                                        className="flex-1 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-lg shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
-                                                    >
-                                                        {loadingId === s.id ? "Working..." : s.action}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => dismissSuggestion(s.id)}
-                                                        className="px-3 py-1.5 text-xs font-bold bg-muted text-muted-foreground border border-border rounded-lg hover:bg-muted/80 hover:text-foreground transition-colors"
-                                                    >
-                                                        Dismiss
-                                                    </button>
+                                        <div className="p-6 relative z-10">
+                                            <h2 className="text-lg font-bold text-foreground flex items-center gap-2 mb-4">
+                                                <div className="p-1.5 rounded-lg bg-primary/20 text-primary">
+                                                    <Icon icon={Sparkles} size="sm" />
                                                 </div>
+                                                Copilot
+                                            </h2>
+                                            
+                                            <div className="space-y-3">
+                                                {visibleSuggestions.length === 0 ? (
+                                                    <div className="p-5 text-center bg-card/50 rounded-[16px] text-sm font-medium text-muted-foreground border border-border/50">
+                                                        No new suggestions right now.
+                                                    </div>
+                                                ) : (
+                                                    visibleSuggestions.map((s) => (
+                                                        <div
+                                                            key={s.id}
+                                                            className="p-4 rounded-[16px] bg-card border border-border/50 shadow-sm"
+                                                        >
+                                                            <p className="text-sm text-foreground font-medium mb-3 leading-snug">
+                                                                {s.text}
+                                                            </p>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => executeSuggestion(s.id, s.text)}
+                                                                    disabled={loadingId === s.id}
+                                                                    className="flex-1 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                                                >
+                                                                    {loadingId === s.id ? "Working..." : s.action}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => dismissSuggestion(s.id)}
+                                                                    className="px-3 py-1.5 text-xs font-bold bg-transparent text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+                                                                >
+                                                                    Dismiss
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
                                             </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* ── Side Column: Analytics ── */}
-                            <div className="space-y-4 lg:col-span-1">
-                                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                    <Icon icon={CheckCircle2} size="sm" className="text-primary" />
-                                    Today's Status
-                                </h2>
-                                <div className="p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col items-center justify-center min-h-[300px]">
-                                    {pieData.length > 0 ? (
-                                        <div className="w-full h-64">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={pieData}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={60}
-                                                        outerRadius={80}
-                                                        paddingAngle={5}
-                                                        dataKey="value"
-                                                    >
-                                                        {pieData.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip
-                                                        contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }}
-                                                        itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
-                                                    />
-                                                </PieChart>
-                                            </ResponsiveContainer>
                                         </div>
-                                    ) : (
-                                        <p className="text-sm font-medium text-muted-foreground text-center">No tasks to display.</p>
-                                    )}
+                                    </motion.div>
+
+                                    {/* Analytics Donut */}
+                                    <motion.div variants={itemVariant} className="rounded-[24px] border border-border/50 bg-card shadow-sm overflow-hidden flex flex-col">
+                                        <div className="p-6 border-b border-border/50 bg-muted/20">
+                                            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                                                <div className="p-1.5 rounded-lg bg-green-500/10 text-green-500">
+                                                    <Icon icon={CheckCircle2} size="sm" />
+                                                </div>
+                                                Task Breakdown
+                                            </h2>
+                                        </div>
+                                        <div className="p-6 flex-1 flex flex-col items-center justify-center min-h-[260px] relative">
+                                            {pieData.length > 0 ? (
+                                                <>
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0">
+                                                        <span className="text-4xl font-black text-foreground">{todaysTasks.length}</span>
+                                                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-1">Tasks</span>
+                                                    </div>
+                                                    <div className="w-full h-48 z-10 relative">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <PieChart>
+                                                                <Pie
+                                                                    data={pieData}
+                                                                    cx="50%"
+                                                                    cy="50%"
+                                                                    innerRadius={65}
+                                                                    outerRadius={85}
+                                                                    paddingAngle={4}
+                                                                    dataKey="value"
+                                                                    stroke="none"
+                                                                    cornerRadius={6}
+                                                                >
+                                                                    {pieData.map((entry, index) => (
+                                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                                    ))}
+                                                                </Pie>
+                                                                <Tooltip
+                                                                    contentStyle={{ 
+                                                                        borderRadius: '16px', 
+                                                                        border: '1px solid hsl(var(--border))', 
+                                                                        backgroundColor: 'hsl(var(--card) / 0.8)',
+                                                                        backdropFilter: 'blur(12px)',
+                                                                        boxShadow: '0 8px 32px -8px rgba(0,0,0,0.1)'
+                                                                    }}
+                                                                    itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                                                                />
+                                                            </PieChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <p className="text-sm font-medium text-muted-foreground text-center">No data for today.</p>
+                                            )}
+                                        </div>
+                                    </motion.div>
+
                                 </div>
                             </div>
                         </div>
-
-                    </div>
+                    </motion.div>
                 </div>
             </div>
 

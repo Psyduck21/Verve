@@ -17,6 +17,7 @@ const CreateTaskSchema = z.object({
   scheduled_at: z.string().datetime({ offset: true }).or(z.date()).nullable().optional(),
   estimated_duration_minutes: z.number().optional(),
   is_time_locked: z.boolean().optional(),
+  recurrence_rule: z.string().optional().nullable(),
 })
 
 const UpdateTaskSchema = z.object({
@@ -29,6 +30,7 @@ const UpdateTaskSchema = z.object({
   estimated_duration_minutes: z.number().optional(),
   actual_duration_minutes: z.number().optional().nullable(),
   is_time_locked: z.boolean().optional(),
+  recurrence_rule: z.string().optional().nullable(),
 })
 
 export const tasksRoutes: FastifyPluginAsync = async (app) => {
