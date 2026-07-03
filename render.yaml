@@ -6,9 +6,10 @@ services:
     region: singapore
     buildCommand: npm install -g pnpm && pnpm install && pnpm --filter=@verve/backend build
     startCommand: pnpm --filter=@verve/backend start
-    nodeVersion: 20
     healthCheckPath: /health
     envVars:
+      - key: NODE_VERSION
+        value: 20
       - key: NODE_ENV
         value: development
       - key: SUPABASE_URL
