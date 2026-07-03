@@ -11,7 +11,7 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: NODE_ENV
-        value: development
+        value: production
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
