@@ -28,12 +28,3 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
-
-  - type: cron
-    name: verve-keep-alive
-    runtime: node
-    plan: free
-    region: singapore
-    schedule: "*/14 * * * *"
-    buildCommand: ""
-    startCommand: "node -e \"fetch('https://verve-backend-iwzb.onrender.com/health')\""
