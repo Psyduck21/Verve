@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Calendar as BigCalendar, dateFnsLocalizer, Views } from "react-big-calendar"
 import { format, parse, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, isWithinInterval, getDay } from "date-fns"
 import { enUS } from "date-fns/locale/en-US"
@@ -109,6 +110,14 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
     const { events } = useEvents(queryParams)
     const { data: tasks = [] } = useTasks(queryParams)
     const { mutate: updateTask } = useUpdateTask()
+
+    const { data: profileResponse } = useQuery({
+        queryKey: ["profile"],
+        queryFn: apiClient.users.getProfile,
+    })
+    const profile = profileResponse?.data || {}
+    const [wakeHour, wakeMinute] = (profile.wake_time || "09:00:00").split(':').map(Number)
+    const [sleepHour, sleepMinute] = (profile.sleep_time || "22:00:00").split(':').map(Number)
 
 
     // Dynamically calculate stats based on current view range
@@ -296,8 +305,13 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
 
     const slotPropGetter = (date: Date) => {
         const hour = date.getHours()
-        // Non-working hours: before 9 AM or after 5 PM
-        if (hour < 9 || hour >= 17) {
+        const minute = date.getMinutes()
+        const timeInMinutes = hour * 60 + minute
+        const wakeInMinutes = wakeHour * 60 + wakeMinute
+        const sleepInMinutes = sleepHour * 60 + sleepMinute
+
+        // Non-working hours: before wake time or after sleep time
+        if (timeInMinutes < wakeInMinutes || timeInMinutes >= sleepInMinutes) {
             return {
                 className: 'non-working-hour'
             }
@@ -315,13 +329,13 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
         }
     }
 
-    // Set calendar start time to 9 AM (work time)
+    // Set calendar start time based on wake time (minus 1 hour for padding)
     const minTime = new Date()
-    minTime.setHours(9, 0, 0, 0)
+    minTime.setHours(Math.max(0, wakeHour - 1), 0, 0, 0)
 
-    // Set calendar max time (e.g. 8 PM)
+    // Set calendar max time based on sleep time (plus 1 hour for padding, bounded to 23:59)
     const maxTime = new Date()
-    maxTime.setHours(20, 0, 0, 0)
+    maxTime.setHours(Math.min(23, sleepHour + 1), 59, 59, 999)
 
     const onEventDrop = ({ event, start, end }: any) => {
         const taskId = event.task?.id

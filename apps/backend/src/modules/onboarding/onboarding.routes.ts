@@ -222,6 +222,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
     const updated = await db.transaction(async (tx) => {
       const [profile] = await tx.select({
         onboarding_completed: users.onboarding_completed,
+        wake_time: users.wake_time,
       }).from(users).where(eq(users.id, user.id))
 
       const alreadyCompleted = Boolean(profile?.onboarding_completed)
@@ -268,7 +269,8 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
           // Create tasks from the routine
           const tomorrow = new Date()
           tomorrow.setDate(tomorrow.getDate() + 1)
-          tomorrow.setHours(9, 0, 0, 0)
+          const [wakeHour, wakeMinute] = (profile?.wake_time || '09:00:00').split(':').map(Number)
+          tomorrow.setHours(wakeHour, wakeMinute, 0, 0)
           let currentMinutes = 0
           
           await tx.insert(tasks).values(accepted_routine.tasks.map((task) => {
@@ -293,7 +295,8 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
         if (first_task_created && first_task_title?.trim()) {
           const tomorrow = new Date()
           tomorrow.setDate(tomorrow.getDate() + 1)
-          tomorrow.setHours(9, 0, 0, 0)
+          const [wakeHour, wakeMinute] = (profile?.wake_time || '09:00:00').split(':').map(Number)
+          tomorrow.setHours(wakeHour, wakeMinute, 0, 0)
 
           await tx.insert(tasks).values({
             user_id: user.id,
