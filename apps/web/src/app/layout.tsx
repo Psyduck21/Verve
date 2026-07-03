@@ -5,6 +5,7 @@ import { Providers } from "@/components/Providers"
 import { OfflineIndicator } from "@/components/ui/offline-indicator"
 import { GlobalShortcuts } from "@/components/GlobalShortcuts"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import NextTopLoader from 'nextjs-toploader'
 import "./globals.css"
 
@@ -48,6 +49,7 @@ export default function RootLayout({
                         <GlobalShortcuts />
                     </Providers>
                 </ErrorBoundary>
+                <SpeedInsights />
             </body>
         </html>
     )
