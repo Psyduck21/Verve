@@ -25,7 +25,7 @@ export const taskPriorityEnum   = pgEnum('task_priority',   ['critical', 'high',
 export const syncOperationEnum  = pgEnum('sync_operation',  ['INSERT', 'UPDATE', 'DELETE'])
 export const aiRequestTypeEnum  = pgEnum('ai_request_type', ['generate_routine', 'extract_questions', 'reschedule', 'extract_email', 'parse_task', 'assistant_plan', 'assistant_execute'])
 export const oauthProviderEnum  = pgEnum('oauth_provider',  ['google', 'github', 'apple', 'microsoft'])
-export const externalProviderEnum = pgEnum('external_provider', ['google_calendar', 'gmail', 'chrome_extension', 'slack', 'outlook', 'zoom'])
+export const externalProviderEnum = pgEnum('external_provider', ['google_calendar', 'gmail', 'chrome_extension', 'slack', 'outlook', 'zoom', 'linear'])
 export const userRoleEnum       = pgEnum('user_role',       ['viewer', 'admin', 'superadmin'])
 
 // ── users ─────────────────────────────────────────────────────
