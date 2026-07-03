@@ -4,6 +4,7 @@ import { db } from '../../lib/db'
 import { users, onboardingAnalytics, routines, tasks } from '@verve/db'
 import { and, eq, sql } from '@verve/db'
 import { OnboardingService } from './onboarding.service'
+import { logger } from '../../lib/logger'
 
 function deriveFullName(email?: string, userMetadata?: Record<string, any>) {
   return userMetadata?.full_name
@@ -190,7 +191,7 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
       return reply.send({ success: true, data: tasks })
     } catch (e: any) {
       // If AI fails, return template-based fallback
-      console.error('AI routine generation failed, using fallback:', e.message)
+      logger.error('AI routine generation failed, using fallback', e as Error)
       const fallbackTasks = OnboardingService.generateTemplateRoutine(parsed.data)
       return reply.send({ success: true, data: fallbackTasks, fallback: true })
     }

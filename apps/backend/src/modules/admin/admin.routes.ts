@@ -6,6 +6,9 @@ import { eq, desc, count } from '@verve/db'
 export const adminRoutes: FastifyPluginAsync = async (app) => {
   // Middleware to ensure user is superadmin
   app.addHook('preHandler', async (req, reply) => {
+    // Authenticate first, to populate req.user
+    await app.authenticate(req, reply)
+    
     // In a real app, this would check a role or specific email list
     const user = req.user!
     const dbUser = await db.select().from(users).where(eq(users.id, user.id)).then(r => r[0])

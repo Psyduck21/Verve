@@ -5,6 +5,7 @@ import { oauthIdentities, tasks, taskExternalMetadata } from '@verve/db'
 import { eq, and } from '@verve/db'
 import { TasksService } from '../../tasks/tasks.service'
 import { FastifyBaseLogger } from 'fastify'
+import pLimit from 'p-limit'
 
 export class LinearAdapter implements ITaskAdapter {
   providerName = 'linear'
@@ -32,17 +33,20 @@ export class LinearAdapter implements ITaskAdapter {
   async syncTasks(userId: string, integrationId: string): Promise<SyncResult> {
     const result: SyncResult = { added: 0, updated: 0, removed: 0, errors: [] }
     const client = await this.getClient(userId, integrationId)
-    
+
     if (!client) {
       result.errors.push('Failed to initialize Linear client')
       return result
     }
 
     try {
-      // 1. Fetch active issues assigned to the user
+      // 1. Fetch active issues assigned to the user (limit to 100 to prevent OOM)
       const me = await client.viewer
-      const myIssues = await me.assignedIssues({ filter: { state: { type: { nin: ['completed', 'canceled'] } } } })
-      
+      const myIssues = await me.assignedIssues({
+        filter: { state: { type: { nin: ['completed', 'canceled'] } } },
+        first: 100 // Limit to 100 issues to prevent memory exhaustion
+      })
+
       // 2. Fetch existing internal tasks linked to Linear
       const existingLinkedTasks = await db.select({
         taskId: tasks.id,
@@ -59,30 +63,39 @@ export class LinearAdapter implements ITaskAdapter {
 
       const existingMap = new Map(existingLinkedTasks.map(t => [t.externalId, t.taskId]))
 
-      for (const issue of myIssues.nodes) {
-        const payload = {
-          title: issue.title,
-          description: issue.description || '',
-          status: 'not_started', // Map Linear states to internal states
-          priority: issue.priority === 1 ? 'critical' : issue.priority === 2 ? 'high' : issue.priority === 3 ? 'medium' : 'low',
-          external_provider: 'linear',
-          external_id: issue.id,
-          external_link: issue.url,
-        }
+      // Optimized: Process issues in parallel with concurrency control
+      const limit = pLimit(5) // Max 5 concurrent operations
 
-        const internalTaskId = existingMap.get(issue.id)
+      const operations = myIssues.nodes.map(issue =>
+        limit(async () => {
+          const payload = {
+            title: issue.title,
+            description: issue.description || '',
+            status: 'not_started', // Map Linear states to internal states
+            priority: issue.priority === 1 ? 'critical' : issue.priority === 2 ? 'high' : issue.priority === 3 ? 'medium' : 'low',
+            external_provider: 'linear',
+            external_id: issue.id,
+            external_link: issue.url,
+          }
 
-        if (internalTaskId) {
-          // Update existing task
-          await TasksService.updateTask(userId, internalTaskId, payload)
-          result.updated++
-        } else {
-          // Create new task
-          await TasksService.createTask(userId, payload)
-          result.added++
-        }
-      }
-      
+          const internalTaskId = existingMap.get(issue.id)
+
+          if (internalTaskId) {
+            // Update existing task
+            await TasksService.updateTask(userId, internalTaskId, payload)
+            return 'updated'
+          } else {
+            // Create new task
+            await TasksService.createTask(userId, payload)
+            return 'added'
+          }
+        })
+      )
+
+      const results = await Promise.all(operations)
+      result.updated = results.filter(r => r === 'updated').length
+      result.added = results.filter(r => r === 'added').length
+
       return result
     } catch (error: any) {
       this.logger.error({ err: error, userId }, 'Error syncing Linear tasks')

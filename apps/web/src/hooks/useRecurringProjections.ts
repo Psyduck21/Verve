@@ -29,12 +29,13 @@ export function useRecurringProjections(
     windowEnd: Date
 ): VirtualEvent[] {
     return useMemo(() => {
-        // Build a Set of "<masterTaskId>|<dateString>" for real children already in DB
+        // Build a Set of "<masterTaskId>|<ISO-date>" for real children already in DB
+        // Use ISO string for precision (includes time) to avoid false positives
         const realChildDates = new Set<string>()
         for (const task of tasks) {
             if (task.parent_task_id && task.scheduled_at) {
-                const dayKey = new Date(task.scheduled_at).toDateString()
-                realChildDates.add(`${task.parent_task_id}|${dayKey}`)
+                const dateKey = new Date(task.scheduled_at).toISOString()
+                realChildDates.add(`${task.parent_task_id}|${dateKey}`)
             }
         }
 
@@ -58,16 +59,16 @@ export function useRecurringProjections(
                 const occurrences = rebuiltRule.between(windowStart, windowEnd, true)
 
                 for (const occDate of occurrences) {
-                    const dayKey = occDate.toDateString()
-                    const skipKey = `${task.id}|${dayKey}`
+                    const dateKey = occDate.toISOString()
+                    const skipKey = `${task.id}|${dateKey}`
 
-                    // Skip if a real occurrence already exists for this day
+                    // Skip if a real occurrence already exists for this exact date/time
                     if (realChildDates.has(skipKey)) continue
 
                     // Skip the master task's own day (it shows as a real event)
                     if (task.scheduled_at) {
-                        const masterDay = new Date(task.scheduled_at).toDateString()
-                        if (dayKey === masterDay) continue
+                        const masterDateKey = new Date(task.scheduled_at).toISOString()
+                        if (dateKey === masterDateKey) continue
                     }
 
                     const duration = task.estimated_duration_minutes ?? 30

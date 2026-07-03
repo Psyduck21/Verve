@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { openRouterCircuitBreaker } from './circuitBreaker'
+import { logger } from './logger'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const API_KEY = process.env.OPENROUTER_API_KEY
@@ -81,7 +82,7 @@ export async function callOpenRouter<T>(params: {
         }
       } catch (e: any) {
         // Ignore schema parse errors or rate limits for the current model, let it fallback
-        console.warn(`Model ${model} failed:`, e.message)
+        logger.warn(`Model ${model} failed: ${e.message}`)
         continue
       }
     }
@@ -165,7 +166,7 @@ export async function* callOpenRouterStream(params: {
       yield { content: '', done: true }
       return
     } catch (e: any) {
-      console.warn(`Model ${model} failed:`, e.message)
+      logger.warn(`Model ${model} failed: ${e.message}`)
       continue
     }
   }

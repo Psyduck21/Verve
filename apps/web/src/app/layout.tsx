@@ -6,6 +6,8 @@ import { OfflineIndicator } from "@/components/ui/offline-indicator"
 import { GlobalShortcuts } from "@/components/GlobalShortcuts"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import NextTopLoader from 'nextjs-toploader'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -48,6 +50,8 @@ export default function RootLayout({
                         <GlobalShortcuts />
                     </Providers>
                 </ErrorBoundary>
+                <Analytics />
+                <SpeedInsights />
             </body>
         </html>
     )

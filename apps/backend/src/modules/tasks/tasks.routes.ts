@@ -33,58 +33,132 @@ const UpdateTaskSchema = z.object({
   recurrence_rule: z.string().optional().nullable(),
 })
 
+// Define response schemas for Fastify validation and optimization
+const TaskResponseSchema = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean' },
+    data: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string', nullable: true },
+        status: { type: 'string' },
+        priority: { type: 'string' },
+        scheduled_at: { type: 'string', format: 'date-time', nullable: true },
+        estimated_duration_minutes: { type: 'number', nullable: true },
+        actual_duration_minutes: { type: 'number', nullable: true },
+        category: { type: 'string', nullable: true },
+        is_time_locked: { type: 'boolean' },
+        parent_task_id: { type: 'string', nullable: true },
+        routine_id: { type: 'string', nullable: true },
+        created_at: { type: 'string', format: 'date-time' },
+        updated_at: { type: 'string', format: 'date-time' }
+      }
+    }
+  }
+} as const
+
+const TaskListResponseSchema = {
+  type: 'object',
+  properties: {
+    success: { type: 'boolean' },
+    data: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          description: { type: 'string', nullable: true },
+          status: { type: 'string' },
+          priority: { type: 'string' },
+          scheduled_at: { type: 'string', format: 'date-time', nullable: true },
+          estimated_duration_minutes: { type: 'number', nullable: true },
+          actual_duration_minutes: { type: 'number', nullable: true },
+          category: { type: 'string', nullable: true },
+          is_time_locked: { type: 'boolean' },
+          parent_task_id: { type: 'string', nullable: true },
+          routine_id: { type: 'string', nullable: true },
+          updated_at: { type: 'string', format: 'date-time' },
+          external_provider: { type: 'string', nullable: true },
+          recurrence_rule: { type: 'string', nullable: true }
+        }
+      }
+    },
+    pagination: {
+      type: 'object',
+      properties: {
+        nextCursor: { type: 'string', nullable: true },
+        hasMore: { type: 'boolean' },
+        limit: { type: 'number' }
+      }
+    }
+  }
+} as const
+
 export const tasksRoutes: FastifyPluginAsync = async (app) => {
+
   // LIST TASKS (with pagination)
-  app.get('/', { preHandler: [app.authenticate] }, async (req, reply) => {
+  app.get('/', { 
+    preHandler: [app.authenticate],
+    schema: { response: { 200: TaskListResponseSchema } }
+  }, async (req, reply) => {
     const user = req.user!
-    
+
     const parsed = TaskListQuerySchema.safeParse(req.query)
     if (!parsed.success) {
       return reply.status(400).send({ success: false, error: parsed.error.issues })
     }
-    
+
     const { cursor, limit, start_date, end_date } = parsed.data
     if (start_date && end_date && start_date > end_date) {
       return reply.status(400).send({ success: false, error: 'start_date must be before or equal to end_date' })
     }
-    
-    // Build conditions for non-recurring tasks (respect date window)
-    // Recurring master tasks (those with a recurrence_rule) are ALWAYS returned
-    // regardless of start_date/end_date — the frontend projects their virtual occurrences.
-    const baseConditions: any[] = [eq(tasks.user_id, user.id), isNull(tasks.parent_task_id)]
-    if (cursor) {
-      baseConditions.push(lt(tasks.scheduled_at, new Date(cursor)))
-    }
 
-    const nonRecurringConditions = [...baseConditions]
-    if (start_date) nonRecurringConditions.push(gte(tasks.scheduled_at, start_date))
-    if (end_date) nonRecurringConditions.push(lte(tasks.scheduled_at, end_date))
+    // Build conditions to include:
+    // 1. Parent tasks (no parent_task_id): recurring masters always, non-recurring only if in date range
+    // 2. Child tasks (have parent_task_id): only if they fall within the date range
+    // This is CRITICAL for the frontend's virtual projection skip logic to work correctly
+    const parentTaskConditions: any[] = [
+      eq(tasks.user_id, user.id),
+      isNull(tasks.parent_task_id),
+      cursor ? lt(tasks.scheduled_at, new Date(cursor)) : undefined,
+      // Parent tasks: include if recurring (always) OR falls within date range
+      or(
+        isNotNull(taskRecurrences.id),
+        and(
+          start_date ? gte(tasks.scheduled_at, start_date) : undefined,
+          end_date ? lte(tasks.scheduled_at, end_date) : undefined
+        )
+      )
+    ]
 
-    // Query: fetch tasks that either (a) fall in the date window (non-recurring)
-    //        or (b) have a recurrence rule (master tasks, always included)
+    const childTaskConditions: any[] = [
+      eq(tasks.user_id, user.id),
+      isNotNull(tasks.parent_task_id),
+      cursor ? lt(tasks.scheduled_at, new Date(cursor)) : undefined,
+      // Child tasks: only include if they fall within the date range
+      start_date ? gte(tasks.scheduled_at, start_date) : undefined,
+      end_date ? lte(tasks.scheduled_at, end_date) : undefined
+    ]
+
+    // Query: fetch both parent and child tasks
     const results = await db
       .select()
       .from(tasks)
       .leftJoin(taskExternalMetadata, eq(tasks.id, taskExternalMetadata.task_id))
       .leftJoin(taskRecurrences, eq(tasks.id, taskRecurrences.task_id))
       .where(
-        and(
-          eq(tasks.user_id, user.id),
-          isNull(tasks.parent_task_id),
-          cursor ? lt(tasks.scheduled_at, new Date(cursor)) : undefined,
-          // Include task if it has a recurrence rule OR falls within date range
-          or(
-            isNotNull(taskRecurrences.id),
-            and(
-              start_date ? gte(tasks.scheduled_at, start_date) : undefined,
-              end_date ? lte(tasks.scheduled_at, end_date) : undefined
-            )
-          )
+        or(
+          and(...parentTaskConditions),
+          and(...childTaskConditions)
         )
       )
       .orderBy(desc(tasks.scheduled_at))
       .limit(limit + 1) // Fetch one extra to determine if there's a next page
-    
+
     const flattenedResults = results.map(row => ({
       ...row.tasks,
       external_provider: row.task_external_metadata?.external_provider || null,
@@ -94,7 +168,7 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
     const hasMore = flattenedResults.length > limit
     const taskList = hasMore ? flattenedResults.slice(0, -1) : flattenedResults
     const nextCursor = hasMore ? taskList[taskList.length - 1].scheduled_at?.toISOString() : null
-    
+
     return reply.send({
       success: true,
       data: taskList,
@@ -107,7 +181,10 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // CREATE TASK
-  app.post('/', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
+  app.post('/', { 
+    preHandler: [app.authenticate, app.validateCSRF],
+    schema: { response: { 201: TaskResponseSchema } }
+  }, async (req, reply) => {
     const user = req.user!
     
     const parsed = CreateTaskSchema.safeParse(req.body)
@@ -133,7 +210,10 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // UPDATE TASK
-  app.put('/:id', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
+  app.put('/:id', { 
+    preHandler: [app.authenticate, app.validateCSRF],
+    schema: { response: { 200: TaskResponseSchema } }
+  }, async (req, reply) => {
     const user = req.user!
     const { id } = req.params as { id: string }
     

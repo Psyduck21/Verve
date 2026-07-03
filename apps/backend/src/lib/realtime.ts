@@ -15,26 +15,29 @@ export class RealtimeService {
    */
   async broadcastEvent(userId: string, eventName: string, payload: any) {
     const channelName = `user_${userId}`
+    const channel = supabase.channel(channelName)
+
     try {
       this.logger.debug({ channelName, eventName, payload }, 'Broadcasting realtime event')
-      
-      const channel = supabase.channel(channelName)
-      
+
       const result = await channel.send({
         type: 'broadcast',
         event: eventName,
         payload: payload,
       })
-      
+
       if (result !== 'ok') {
         this.logger.error({ channelName, eventName, result }, 'Failed to broadcast event')
       }
-
-      // Important: Remove the channel after sending so the backend doesn't keep endless websocket connections open
-      await supabase.removeChannel(channel)
-      
     } catch (error) {
       this.logger.error({ err: error, channelName, eventName }, 'Error during broadcast event')
+    } finally {
+      // Ensure channel is always removed to prevent memory leaks
+      try {
+        await supabase.removeChannel(channel)
+      } catch (removeError) {
+        this.logger.error({ err: removeError, channelName }, 'Failed to remove channel')
+      }
     }
   }
 }

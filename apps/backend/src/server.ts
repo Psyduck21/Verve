@@ -43,6 +43,7 @@ if (process.env.POWERSYNC_PRIVATE_KEY) {
 import Fastify from 'fastify'
 import * as Sentry from '@sentry/node'
 import fastifyCookie from '@fastify/cookie'
+import compress from '@fastify/compress'
 import swagger from '@fastify/swagger'
 import swaggerUI from '@fastify/swagger-ui'
 import { corsPlugin } from './plugins/cors.plugin'
@@ -54,6 +55,8 @@ import csrfPlugin from './plugins/csrf.plugin'
 import { auditPlugin } from './plugins/audit.plugin'
 import { notificationWorkerPlugin } from './plugins/notification-worker.plugin'
 import { recurrenceWorkerPlugin } from './plugins/recurrence-worker.plugin'
+import { aiWorkerPlugin } from './plugins/ai-worker.plugin'
+import { metricsPlugin } from './plugins/metrics.plugin'
 import { db } from './lib/db'
 import { redis } from './lib/redis'
 import { sql } from '@verve/db'
@@ -77,7 +80,7 @@ import { routinesRoutes } from './modules/routines/routines.routes'
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN || '',
-  tracesSampleRate: 1.0,
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
 })
 
 // The port must fallback to process.env.PORT for Render deployment compatibility
@@ -103,11 +106,21 @@ async function bootstrap() {
     requestIdHeader: 'x-request-id',
     genReqId: () => crypto.randomUUID(),
     trustProxy: true,  // Required behind Cloudflare / Railway proxy
+    connectionTimeout: 30000, // 30 seconds connection timeout
+    requestTimeout: 30000, // 30 seconds request timeout
   })
 
   // ── Global plugins ────────────────────────────────────────
   await app.register(helmetPlugin)
   await app.register(fastifyCookie)
+  await app.register(compress, {
+    encodings: ['gzip', 'deflate', 'br'],
+    threshold: 1024, // Only compress payloads > 1KB
+    zlib: {
+      level: 6, // Balance compression vs CPU
+      chunkSize: 16 * 1024
+    }
+  })
   await app.register(csrfPlugin)
   await app.register(corsPlugin)
   await app.register(rateLimitPlugin)
@@ -115,6 +128,8 @@ async function bootstrap() {
   await app.register(auditPlugin)
   await app.register(notificationWorkerPlugin)
   await app.register(recurrenceWorkerPlugin)
+  await app.register(aiWorkerPlugin)
+  await app.register(metricsPlugin)
 
   // ── Swagger API Documentation ─────────────────────────────
   await app.register(swagger, {
@@ -132,7 +147,7 @@ async function bootstrap() {
   })
   
   await app.register(swaggerUI, {
-    routePrefix: '/documentation',
+    routePrefix: process.env.NODE_ENV === 'production' ? '/disabled-docs' : '/documentation',
     uiConfig: {
       docExpansion: 'list',
       deepLinking: false
@@ -224,6 +239,17 @@ async function bootstrap() {
     }
 
     const statusCode = health.status === 'ok' ? 200 : health.status === 'degraded' ? 200 : 503
+    
+    // Mask infrastructure topology in production
+    if (process.env.NODE_ENV === 'production') {
+      return reply.status(statusCode).send({
+        status: health.status,
+        service: health.service,
+        timestamp: health.timestamp,
+        environment: health.environment
+      })
+    }
+    
     return reply.status(statusCode).send(health)
   })
 

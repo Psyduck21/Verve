@@ -1,10 +1,10 @@
 import { Worker, Job } from 'bullmq'
 import { connection, QUEUE_NAMES } from '../lib/queue'
 import { db } from '../lib/db'
-import { tasks, taskRecurrences, routines } from '@verve/db'
-import { eq, and, isNull, sql } from '@verve/db'
+import { tasks, taskRecurrences, routines, users } from '@verve/db'
+import { eq, and, isNull, sql, inArray } from '@verve/db'
 import { FastifyInstance } from 'fastify'
-import { RRule } from 'rrule'
+import { getRRule } from '../lib/lazyLoader'
 import { TasksService } from '../modules/tasks/tasks.service'
 
 export function startRecurrenceWorker(app: FastifyInstance): Worker {
@@ -16,48 +16,67 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
       if (job.name === 'check-recurrences') {
         app.log.info('Cron triggered: Checking for recurring tasks...')
         
-        const activeRecurrences = await db
-          .select({
-            recurrence: taskRecurrences,
-            task: tasks
-          })
-          .from(taskRecurrences)
-          .innerJoin(tasks, eq(taskRecurrences.task_id, tasks.id))
-          .where(isNull(tasks.deleted_at))
-
         let spawnedCount = 0
         const now = new Date()
         const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+        
+        // Optimized: Fetch all recurrences with user timezone in single query
+        const activeRecurrences = await db
+          .select({
+            recurrence: taskRecurrences,
+            task: tasks,
+            user: users
+          })
+          .from(taskRecurrences)
+          .innerJoin(tasks, eq(taskRecurrences.task_id, tasks.id))
+          .innerJoin(users, eq(tasks.user_id, users.id))
+          .where(isNull(tasks.deleted_at))
+        
+        if (activeRecurrences.length === 0) {
+          return { success: true, spawnedCount: 0 }
+        }
 
+        // Optimized: Batch fetch existing spawns to avoid N+1 queries
+        const parentIds = activeRecurrences.map(r => r.task.id)
+        const existingSpawns = await db
+          .select({ parent_task_id: tasks.parent_task_id, scheduled_at: tasks.scheduled_at })
+          .from(tasks)
+          .where(inArray(tasks.parent_task_id, parentIds))
+        
+        const spawnSet = new Set(
+          existingSpawns
+            .filter(s => s.scheduled_at !== null)
+            .map(s => `${s.parent_task_id}-${s.scheduled_at!.toISOString()}`)
+        )
+        
+        // Optimized: Cache parsed RRules to avoid repeated parsing
+        const ruleCache = new Map<string, any>()
+        const RRule = await getRRule()
+        
         for (const record of activeRecurrences) {
           try {
-            const rule = RRule.fromString(record.recurrence.recurrence_rule)
-            // Use the original task's scheduled_at as the start date, or created_at if not set
-            const dtstart = record.task.scheduled_at || record.task.created_at
+            const ruleKey = record.recurrence.recurrence_rule
             
-            // Set the start date for the rule
-            const options = rule.origOptions
-            options.dtstart = dtstart
-            const activeRule = new RRule(options)
-
-            // Find the next occurrence after today
-            const nextDate = activeRule.after(now)
+            // Use cached rule if available
+            let rule = ruleCache.get(ruleKey)
+            if (!rule) {
+              rule = RRule.fromString(ruleKey)
+              const options = rule.origOptions
+              options.dtstart = record.task.scheduled_at || record.task.created_at
+              // Set timezone to user's timezone for accurate occurrence calculation
+              options.tzid = record.user.timezone || 'UTC'
+              rule = new RRule(options)
+              ruleCache.set(ruleKey, rule)
+            }
+            
+            const nextDate = rule.after(now)
 
             // If the next occurrence is within the next 24 hours
             if (nextDate && nextDate <= tomorrow) {
-              // Check if a spawn already exists for this exact date
-              const existingSpawn = await db
-                .select({ id: tasks.id })
-                .from(tasks)
-                .where(
-                  and(
-                    eq(tasks.parent_task_id, record.task.id),
-                    eq(tasks.scheduled_at, nextDate)
-                  )
-                )
-                .limit(1)
-
-              if (existingSpawn.length === 0) {
+              const spawnKey = `${record.task.id}-${nextDate.toISOString()}`
+              
+              // Check against set instead of querying database
+              if (!spawnSet.has(spawnKey)) {
                 app.log.info(`Spawning recurring task for ${record.task.title} at ${nextDate}`)
                 
                 // Spawn it using TasksService to ensure side-effects (like notifications) run
@@ -85,7 +104,7 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
     },
     {
       connection: connection as any,
-      concurrency: 1, 
+      concurrency: 2, // Increased from 1 for better parallelism
       removeOnComplete: { count: 100 },
       removeOnFail: { count: 500 },
     }

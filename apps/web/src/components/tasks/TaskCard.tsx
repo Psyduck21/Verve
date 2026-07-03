@@ -84,12 +84,11 @@ export function TaskCard({ task, isOverlay, isFocused, isSelected, onClick }: Ta
         <motion.div
             layout
             exit={{ opacity: 0, scale: 0.95 }}
-            whileHover={{ y: -1 }}
             onClick={onClick}
             ref={setNodeRef}
             style={style}
             className={cn(
-                "group relative border-y border-r border-l-[5px] p-5 rounded-2xl flex flex-col gap-3 shadow-none hover:shadow-md transition-all cursor-default outline-none",
+                "group relative border-y border-r border-l-[5px] p-5 rounded-2xl flex flex-col gap-3 shadow-none hover:shadow-md hover:-translate-y-0.5 transition-all cursor-default outline-none",
                 "bg-card",
                 task.priority && PRIORITY_BORDER_COLORS[task.priority as keyof typeof PRIORITY_BORDER_COLORS] ? PRIORITY_BORDER_COLORS[task.priority as keyof typeof PRIORITY_BORDER_COLORS] : "border-l-border",
                 "border-y-border border-r-border",

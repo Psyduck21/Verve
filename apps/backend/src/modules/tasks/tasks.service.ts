@@ -3,6 +3,7 @@ import { tasks, routines, tombstones, taskRecurrences, taskExternalMetadata, not
 import { eq, and, desc, isNull } from '@verve/db'
 import { z } from 'zod'
 import { redis, RedisKeys } from '../../lib/redis'
+import { CacheService } from '../../lib/cache'
 import { realtimeService } from '../../lib/realtime'
 import { notificationQueue } from '../../lib/queue'
 
@@ -26,6 +27,24 @@ export class TasksService {
     )
 
     await Promise.all([...uniqueKeys].map((key) => redis.del(key)))
+  }
+
+  /**
+   * Get user routine with multi-level caching
+   */
+  private static async getUserRoutine(userId: string) {
+    const cacheKey = `user:routine:${userId}`
+    const cached = await CacheService.get(cacheKey)
+    if (cached) return cached as Array<{ id: string }>
+    
+    const routine = await db
+      .select({ id: routines.id })
+      .from(routines)
+      .where(eq(routines.user_id, userId))
+      .limit(1)
+    
+    await CacheService.set(cacheKey, routine, { ttl: 600, tags: [`user:${userId}`] })
+    return routine
   }
 
   private static async syncNotifications(tx: any, userId: string, taskId: string, taskTitle: string, scheduledAt: Date | null) {
@@ -55,12 +74,24 @@ export class TasksService {
 
   static async createTask(userId: string, taskData: any) {
     let routineId = taskData.routine_id
+    
+    // Optimized: Batch fetch validation data in parallel
+    const [routine, parentTask] = await Promise.all([
+      taskData.routine_id 
+        ? db.select({ id: routines.id }).from(routines)
+            .where(and(eq(routines.id, taskData.routine_id), eq(routines.user_id, userId)))
+            .limit(1)
+        : Promise.resolve([]),
+      taskData.parent_task_id
+        ? db.select({ id: tasks.id }).from(tasks)
+            .where(and(eq(tasks.id, taskData.parent_task_id), eq(tasks.user_id, userId)))
+            .limit(1)
+        : Promise.resolve([])
+    ])
+    
     if (!routineId) {
-      const userRoutines = await db
-        .select({ id: routines.id })
-        .from(routines)
-        .where(eq(routines.user_id, userId))
-        .limit(1)
+      // Use cached routine lookup
+      const userRoutines = await this.getUserRoutine(userId)
       if (userRoutines.length) {
         routineId = userRoutines[0].id
       } else {
@@ -69,15 +100,16 @@ export class TasksService {
           .values({ user_id: userId, title: 'Default Routine' })
           .returning({ id: routines.id })
         routineId = newRoutine.id
+        // Invalidate cache after creating new routine
+        await CacheService.del(`user:routine:${userId}`)
       }
-    } else {
-      const routine = await db
-        .select({ id: routines.id })
-        .from(routines)
-        .where(and(eq(routines.id, routineId), eq(routines.user_id, userId)))
-      if (!routine.length) {
-        throw new Error('Invalid routine_id or unauthorized')
-      }
+    } else if (routine.length === 0) {
+      throw new Error('Invalid routine_id or unauthorized')
+    }
+    
+    // Validate parent task if provided
+    if (taskData.parent_task_id && parentTask.length === 0) {
+      throw new Error('Parent task not found or unauthorized')
     }
 
     const {
@@ -127,6 +159,9 @@ export class TasksService {
     })
 
     await this.invalidateDashboardSummaries(userId, [createdTask.scheduled_at])
+    
+    // Invalidate user-related caches
+    await CacheService.invalidateTag(`user:${userId}`)
     
     if (recurrence_rule) {
       await notificationQueue.add('check-recurrences', {}, { jobId: `manual-trigger-${Date.now()}`, priority: 1 })
@@ -188,9 +223,18 @@ export class TasksService {
 
       const updatedTask = result[0]
 
+      // Optimized: Batch fetch recurrence and external metadata in parallel
+      const [existingRecurrence, existingExternal] = await Promise.all([
+        recurrence_rule !== undefined 
+          ? tx.select().from(taskRecurrences).where(eq(taskRecurrences.task_id, taskId)).limit(1)
+          : Promise.resolve([]),
+        (external_provider !== undefined || external_id !== undefined)
+          ? tx.select().from(taskExternalMetadata).where(eq(taskExternalMetadata.task_id, taskId)).limit(1)
+          : Promise.resolve([])
+      ])
+
       // Handle recurrences
       if (recurrence_rule !== undefined) {
-        const existingRecurrence = await tx.select().from(taskRecurrences).where(eq(taskRecurrences.task_id, taskId)).limit(1)
         if (existingRecurrence.length > 0) {
           await tx.update(taskRecurrences)
             .set({ recurrence_rule, recurrence_parent_id, updated_at: new Date() })
@@ -207,7 +251,6 @@ export class TasksService {
 
       // Handle external metadata
       if (external_provider !== undefined || external_id !== undefined) {
-        const existingExternal = await tx.select().from(taskExternalMetadata).where(eq(taskExternalMetadata.task_id, taskId)).limit(1)
         if (existingExternal.length > 0) {
            await tx.update(taskExternalMetadata)
              .set({ external_provider, external_id, external_link, source_metadata, updated_at: new Date() })
@@ -259,6 +302,9 @@ export class TasksService {
     })
 
     await this.invalidateDashboardSummaries(userId, [previousScheduledAt, updatedTask.scheduled_at])
+
+    // Invalidate user-related caches
+    await CacheService.invalidateTag(`user:${userId}`)
 
     // Manually trigger a check for recurrences if the task is completed or recurrence rule was changed
     if (coreUpdates.status === 'completed' || recurrence_rule !== undefined) {

@@ -43,8 +43,6 @@ export class ErrorBoundary extends Component<Props, State> {
       console.error('Error Boundary caught an error:', error, errorInfo)
     }
 
-    // TODO: Send error to error tracking service (e.g., Sentry)
-    // Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack } } })
   }
 
   handleReset = () => {

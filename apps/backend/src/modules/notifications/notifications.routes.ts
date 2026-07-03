@@ -91,10 +91,4 @@ export const notifRoutes: FastifyPluginAsync = async (app) => {
     
     return reply.send({ success: true })
   })
-
-  // Placeholder routes
-  app.post('/schedule',       async (_, r) => r.status(501).send({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Use Tasks API' } }))
-  app.post('/cancel',         async (_, r) => r.status(501).send({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Use Tasks API' } }))
-  app.get('/preferences',     async (_, r) => r.status(501).send({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Use Users API' } }))
-  app.put('/preferences',     async (_, r) => r.status(501).send({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Use Users API' } }))
 }

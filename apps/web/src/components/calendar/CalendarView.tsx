@@ -88,8 +88,11 @@ interface CalendarViewProps {
     onSelectedDateChange?: (date: Date) => void
 }
 
-export default function CalendarView({ selectedDate, onSelectedDateChange }: CalendarViewProps) {
+export default function CalendarView({ selectedDate: selectedDateProp, onSelectedDateChange }: CalendarViewProps = {}) {
     const [view, setView] = useState<any>(Views.WEEK)
+    // P2-B: selectedDate is now managed internally so the page can be a Server Component
+    const [internalDate, setInternalDate] = useState(() => selectedDateProp ?? new Date())
+    const selectedDate = selectedDateProp ?? internalDate
     const [date, setDate] = useState(() => new Date())
     const [currentTime, setCurrentTime] = useState(() => new Date())
     const [isPanelOpen, setIsPanelOpen] = useState(true)
@@ -467,7 +470,7 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
         }
     }, [queryClient])
 
-    const timeblockDate = selectedDate || date
+    const timeblockDate = selectedDate ?? date
 
     return (
         <div className="flex flex-col h-full w-full animate-fade-in-up gap-2">

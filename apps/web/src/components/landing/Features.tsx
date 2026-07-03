@@ -1,8 +1,8 @@
-"use client"
-
-import { motion } from 'framer-motion'
+// Server Component — no "use client" needed.
+// All animation is handled by the thin LandingMotionWrapper client boundary.
 import { Calendar, Layers, Sparkles, Zap, Command, Brain } from 'lucide-react'
 import { TypewriterText } from '@/components/ui/TypewriterText'
+import { LandingMotionWrapper } from './LandingMotionWrapper'
 
 const features = [
   {
@@ -49,12 +49,7 @@ export function Features() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 lg:mb-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
+          <LandingMotionWrapper transition={{ duration: 0.5 }}>
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground mb-6 tracking-tight">
               Intelligence at <br className="hidden sm:block" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-500">
@@ -64,19 +59,19 @@ export function Features() {
             <p className="text-xl text-muted-foreground font-medium max-w-2xl mx-auto">
               <TypewriterText text="We replaced manual organization with adaptive AI. Experience a workflow where the system works for you, not the other way around." delay={0.3} speed={0.01} />
             </p>
-          </motion.div>
+          </LandingMotionWrapper>
         </div>
 
         {/* Bento Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {features.map((feature, index) => (
-            <motion.div
+            <LandingMotionWrapper
               key={index}
+              delay={feature.delay}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: feature.delay }}
               whileHover={{ scale: 1.02, translateY: -5 }}
+              transition={{ duration: 0.6, delay: feature.delay }}
               className={`relative overflow-hidden rounded-3xl bg-card border border-border/50 shadow-xl group ${feature.colSpan}`}
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
@@ -99,7 +94,7 @@ export function Features() {
                 {/* Decorative bottom corner pattern */}
                 <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-border/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-tl-full" />
               </div>
-            </motion.div>
+            </LandingMotionWrapper>
           ))}
         </div>
       </div>

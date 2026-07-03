@@ -1,6 +1,7 @@
 import { db } from '../../lib/db'
 import { aiRequestLog, users, tasks, eq, sql, and } from '@verve/db'
 import { callOpenRouter, FREE_MODELS } from '../../lib/openrouter'
+import { redis } from '../../lib/redis'
 import {
   GeneratedRoutineSchema,
   EmailExtractionSchema,
@@ -13,31 +14,28 @@ import {
   OmniboxRequest
 } from '@verve/shared'
 import { MemoryService } from './memory.service'
+import { logger } from '../../lib/logger'
 
 export class AiService {
+  // Optimized: Use Redis for rate limiting instead of database locks
   static async checkBudgetAndIncrement(userId: string) {
-    return await db.transaction(async (tx) => {
-      // Lock the user row for update to prevent race conditions
-      const dbUser = await tx.select({ ai_requests: users.ai_requests_used_today })
-        .from(users)
-        .where(eq(users.id, userId))
-        .for('update') // Row-level lock
+    const today = new Date().toISOString().split('T')[0]
+    const key = `ai_budget:${userId}:${today}`
 
-      const user = dbUser[0]
-      if (!user) {
-        throw new Error('User not found')
-      }
+    const current = await redis.incr(key)
+    if (current === 1) {
+      await redis.expire(key, 86400) // Expire at end of day
+    }
 
-      // Check budget before incrementing
-      if (user.ai_requests >= 100) {
-        throw new Error('Daily AI budget exceeded')
-      }
+    if (current > 100) {
+      throw new Error('Daily AI budget exceeded')
+    }
 
-      // Increment counter atomically within the same transaction
-      await tx.update(users)
-        .set({ ai_requests_used_today: sql`${users.ai_requests_used_today} + 1` })
-        .where(eq(users.id, userId))
-    })
+    // Async update to database for persistence (fire and forget)
+    db.update(users)
+      .set({ ai_requests_used_today: sql`${users.ai_requests_used_today} + 1` })
+      .where(eq(users.id, userId))
+      .catch(err => logger.error('Failed to update AI budget in DB', err as Error))
   }
 
   private static async logUsage(userId: string, requestType: any, aiResponse: any, latencyMs: number) {
@@ -52,8 +50,8 @@ export class AiService {
         latency_ms: latencyMs,
         success: true,
       })
-    } catch (e) {
-      console.error('Failed to log AI usage', e)
+    } catch (e: any) {
+      logger.error('Failed to log AI usage', e as Error)
     }
   }
 
@@ -67,8 +65,8 @@ export class AiService {
         success: false,
         error_code: errorMsg,
       })
-    } catch (e) {
-      console.error('Failed to log AI failure', e)
+    } catch (e: any) {
+      logger.error('Failed to log AI failure', e as Error)
     }
   }
 

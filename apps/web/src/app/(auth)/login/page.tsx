@@ -10,7 +10,6 @@ import { Icon } from "@/components/ui/Icon"
 import { GoogleIcon } from "@/components/ui/GoogleIcon"
 import { Loader2, ArrowRight } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
-import { motion } from "framer-motion"
 
 export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false)
@@ -42,12 +41,7 @@ export default function LoginPage() {
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-        >
+        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
             <div className="space-y-1">
                 <h2 className="text-2xl lg:text-3xl font-extrabold text-foreground tracking-tight">Sign in to your account</h2>
                 <p className="text-muted-foreground font-medium text-sm">
@@ -135,6 +129,6 @@ export default function LoginPage() {
                     </Link>
                 </p>
             </footer>
-        </motion.div>
+        </div>
     )
 }

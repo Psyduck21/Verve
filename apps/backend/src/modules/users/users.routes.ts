@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { db } from '../../lib/db'
 import { users, tasks, routines, tombstones } from '@verve/db'
 import { eq } from '@verve/db'
@@ -41,6 +42,33 @@ const WebhookSchema = z.object({
 export const usersRoutes: FastifyPluginAsync = async (app) => {
   // POST /v1/users/webhook - Supabase auth webhook
   app.post('/webhook', async (req, reply) => {
+    // Verify Supabase Webhook Signature
+    const signature = req.headers['x-supabase-signature'] as string
+    if (!signature) {
+      return reply.status(401).send({ error: 'Missing signature' })
+    }
+
+    const webhookSecret = process.env.SUPABASE_WEBHOOK_SECRET || 'dummy_secret_for_local_dev'
+    const hmac = createHmac('sha256', webhookSecret)
+    // Fastify parsing might have consumed the body as an object, but we need the raw body for HMAC if it's strictly enforced.
+    // However, if we just stringify the parsed body, it might differ slightly in whitespace. 
+    // Supabase allows validating against the raw payload. For simplicity, we stringify here, 
+    // but in a production setup, raw body parsing should be enabled for this route.
+    hmac.update(JSON.stringify(req.body))
+    const expectedSig = hmac.digest('hex')
+    
+    try {
+      if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+        // Log mismatch for debugging
+        app.log.warn('Webhook signature mismatch')
+        if (process.env.NODE_ENV === 'production') {
+          return reply.status(401).send({ error: 'Invalid signature' })
+        }
+      }
+    } catch (e) {
+      return reply.status(401).send({ error: 'Invalid signature format' })
+    }
+
     const parsed = WebhookSchema.safeParse(req.body)
     
     if (!parsed.success) {
@@ -68,9 +96,10 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
           target: users.id, // Primary key constraint
         })
         
-        console.log(`[Webhook] Processed user creation for ${record.email}`)
+        
+        app.log.info(`[Webhook] Processed user creation for ${record.email}`)
       } catch (error) {
-        console.error('[Webhook] Error creating user:', error)
+        app.log.error({ error }, '[Webhook] Error creating user')
         // Don't fail the webhook response - Supabase will retry on error
       }
     }

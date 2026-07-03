@@ -1,5 +1,6 @@
 import { db } from '../../lib/db'
 import { callOpenRouter, FREE_MODELS } from '../../lib/openrouter'
+import { redis } from '../../lib/redis'
 import { tasks, routines, users, eq, and, isNull, sql, aiRequestLog } from '@verve/db'
 import {
   AssistantDraftPlanSchema,
@@ -9,6 +10,7 @@ import {
 } from '@verve/shared'
 import { TasksService } from '../tasks/tasks.service'
 import { MemoryService } from './memory.service'
+import { logger } from '../../lib/logger'
 
 const SUPPORTED_ASSISTANT_ACTION_TYPES = new Set([
   'CREATE_ROUTINE',
@@ -19,28 +21,25 @@ const SUPPORTED_ASSISTANT_ACTION_TYPES = new Set([
 ])
 
 export class AssistantService {
+  // Optimized: Use Redis for rate limiting instead of database locks
   static async checkBudgetAndIncrement(userId: string) {
-    return await db.transaction(async (tx) => {
-      const dbUser = await tx
-        .select({ ai_requests: users.ai_requests_used_today })
-        .from(users)
-        .where(eq(users.id, userId))
-        .for('update')
+    const today = new Date().toISOString().split('T')[0]
+    const key = `ai_budget:${userId}:${today}`
 
-      const user = dbUser[0]
-      if (!user) {
-        throw new Error('User not found')
-      }
+    const current = await redis.incr(key)
+    if (current === 1) {
+      await redis.expire(key, 86400) // Expire at end of day
+    }
 
-      if (user.ai_requests >= 50) {
-        throw new Error('Daily AI budget exceeded')
-      }
+    if (current > 50) {
+      throw new Error('Daily AI budget exceeded')
+    }
 
-      await tx
-        .update(users)
-        .set({ ai_requests_used_today: sql`${users.ai_requests_used_today} + 1` })
-        .where(eq(users.id, userId))
-    })
+    // Async update to database for persistence (fire and forget)
+    db.update(users)
+      .set({ ai_requests_used_today: sql`${users.ai_requests_used_today} + 1` })
+      .where(eq(users.id, userId))
+      .catch(err => logger.error('Failed to update AI budget in DB', err as Error))
   }
 
   private static async createRoutine(userId: string, title?: string, goal?: string) {
@@ -132,14 +131,14 @@ CRITICAL RULES:
           latency_ms: latencyMs,
           success: true,
         })
-      } catch (logError) {
-        console.error('Failed to log assistant plan usage:', logError)
+      } catch (logError: any) {
+        logger.error('Failed to log assistant plan usage', logError as Error)
       }
 
       const result = AssistantDraftPlanSchema.parse(aiResponse.data)
       
       // Log plan metadata for analytics
-      console.log(`[Assistant Plan] User: ${userId}, Actions: ${result.actions?.length}, Latency: ${latencyMs}ms, Model: ${aiResponse.model_used}`)
+      logger.info(`[Assistant Plan] User: ${userId}, Actions: ${result.actions?.length}, Latency: ${latencyMs}ms, Model: ${aiResponse.model_used}`)
       
       return result
     } catch (error: any) {
@@ -156,16 +155,15 @@ CRITICAL RULES:
           error_code: error.message,
           latency_ms: latencyMs,
         })
-      } catch (logError) {
-        console.error('Failed to log assistant plan failure:', logError)
+      } catch (logError: any) {
+        logger.error('Failed to log assistant plan failure', logError as Error)
       }
 
-      console.error(`[Assistant Plan Error] User: ${userId}, Error: ${error.message}, Retry: ${retryCount}`)
+      logger.error(`[Assistant Plan Error] User: ${userId}, Error: ${error.message}, Retry: ${retryCount}`)
       
       // Retry logic for transient errors
-      if (retryCount < 2 && (error.message.includes('rate limit') || error.message.includes('timeout') || error.message.includes('502'))) {
-        console.log(`Retrying plan generation (attempt ${retryCount + 1}/3)`)
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))) // Exponential backoff
+      if (retryCount < 3) {
+        logger.info(`Retrying plan generation (attempt ${retryCount + 1}/3)`)
         return this.buildDraftPlan(userId, body, retryCount + 1)
       }
       throw error
@@ -333,11 +331,11 @@ CRITICAL RULES:
         success: failed === 0,
         error_code: failed > 0 ? `${failed} actions failed` : undefined,
       })
-    } catch (logError) {
-      console.error('Failed to log assistant execute usage:', logError)
+    } catch (logError: any) {
+      logger.error('Failed to log assistant execute usage', logError as Error)
     }
 
-    console.log(`[Assistant Execute] User: ${userId}, Actions: ${validated.actions.length}, Success: ${successful}, Failed: ${failed}, Latency: ${latencyMs}ms`)
+    logger.info(`[Assistant Execute] User: ${userId}, Actions: ${validated.actions.length}, Success: ${successful}, Failed: ${failed}, Latency: ${latencyMs}ms`)
 
     return { plan_id: validated.plan_id, results }
   }

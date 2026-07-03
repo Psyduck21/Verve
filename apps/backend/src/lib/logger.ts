@@ -42,7 +42,14 @@ class Logger {
     // Format log message
     const contextStr = Object.entries(entry)
       .filter(([key]) => !['level', 'message', 'error', 'timestamp'].includes(key))
-      .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+      .map(([key, value]) => {
+        // Use safer, faster serialization with error handling
+        try {
+          return `${key}=${JSON.stringify(value)}`
+        } catch {
+          return `${key}=[unserializable]`
+        }
+      })
       .join(' ')
 
     const message = `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}${contextStr ? ` ${contextStr}` : ''}`

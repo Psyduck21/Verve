@@ -3,6 +3,7 @@ import { SyncPushRequestSchema, SyncPullRequestSchema } from '@verve/shared'
 import { db } from '../../lib/db'
 import { tasks, routines, taskCompletions, tombstones } from '@verve/db'
 import { eq, gt, and } from '@verve/db'
+import pLimit from 'p-limit'
 
 export const syncRoutes: FastifyPluginAsync = async (app) => {
 
@@ -16,38 +17,44 @@ export const syncRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
-      // Process sequentially inside a transaction to ensure integrity
+      // Optimized: Process mutations in parallel with concurrency control
+      const limit = pLimit(10) // Max 10 concurrent operations
+      
       await db.transaction(async (tx) => {
-        for (const mutation of body.mutations) {
-          const { table, operation, record } = mutation
-          const rec = record as any
+        const operations = body.mutations.map(mutation => 
+          limit(async () => {
+            const { table, operation, record } = mutation
+            const rec = record as any
 
-          if (operation === 'DELETE') {
-            // Add tombstone
-            await tx.insert(tombstones).values({
-              user_id: user.id,
-              table_name: table,
-              record_id: rec.id,
-              deleted_by_session_id: null,
-            }).onConflictDoNothing()
+            if (operation === 'DELETE') {
+              // Add tombstone
+              await tx.insert(tombstones).values({
+                user_id: user.id,
+                table_name: table,
+                record_id: rec.id,
+                deleted_by_session_id: null,
+              }).onConflictDoNothing()
 
-            // Delete actual record
-            if (table === 'tasks') await tx.delete(tasks).where(and(eq(tasks.id, rec.id), eq(tasks.user_id, user.id)))
-            if (table === 'routines') await tx.delete(routines).where(and(eq(routines.id, rec.id), eq(routines.user_id, user.id)))
-            if (table === 'task_completions') await tx.delete(taskCompletions).where(and(eq(taskCompletions.id, rec.id), eq(taskCompletions.user_id, user.id)))
-          } else {
-            // INSERT or UPDATE (upsert)
-            if (table === 'tasks') {
-              await tx.insert(tasks).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: tasks.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(tasks.user_id, user.id) })
+              // Delete actual record
+              if (table === 'tasks') await tx.delete(tasks).where(and(eq(tasks.id, rec.id), eq(tasks.user_id, user.id)))
+              if (table === 'routines') await tx.delete(routines).where(and(eq(routines.id, rec.id), eq(routines.user_id, user.id)))
+              if (table === 'task_completions') await tx.delete(taskCompletions).where(and(eq(taskCompletions.id, rec.id), eq(taskCompletions.user_id, user.id)))
+            } else {
+              // INSERT or UPDATE (upsert)
+              if (table === 'tasks') {
+                await tx.insert(tasks).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: tasks.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(tasks.user_id, user.id) })
+              }
+              if (table === 'routines') {
+                await tx.insert(routines).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: routines.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(routines.user_id, user.id) })
+              }
+              if (table === 'task_completions') {
+                await tx.insert(taskCompletions).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: taskCompletions.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(taskCompletions.user_id, user.id) })
+              }
             }
-            if (table === 'routines') {
-              await tx.insert(routines).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: routines.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(routines.user_id, user.id) })
-            }
-            if (table === 'task_completions') {
-              await tx.insert(taskCompletions).values({ ...rec, user_id: user.id }).onConflictDoUpdate({ target: taskCompletions.id, set: { ...rec, user_id: user.id, updated_at: new Date() }, where: eq(taskCompletions.user_id, user.id) })
-            }
-          }
-        }
+          })
+        )
+        
+        await Promise.all(operations)
       })
 
       app.log.info({ user: user.id, mutations: body.mutations.length }, 'Sync push applied')
@@ -69,17 +76,51 @@ export const syncRoutes: FastifyPluginAsync = async (app) => {
 
     const changes: Record<string, any[]> = {}
     
+    // Optimized: Selective field projection to reduce payload size
     if (body.tables.includes('tasks')) {
-      changes.tasks = await db.select().from(tasks).where(and(eq(tasks.user_id, user.id), gt(tasks.updated_at, lastSynced)))
+      changes.tasks = await db.select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        status: tasks.status,
+        priority: tasks.priority,
+        scheduled_at: tasks.scheduled_at,
+        estimated_duration_minutes: tasks.estimated_duration_minutes,
+        actual_duration_minutes: tasks.actual_duration_minutes,
+        category: tasks.category,
+        is_time_locked: tasks.is_time_locked,
+        parent_task_id: tasks.parent_task_id,
+        routine_id: tasks.routine_id,
+        updated_at: tasks.updated_at,
+        deleted_at: tasks.deleted_at
+      }).from(tasks).where(and(eq(tasks.user_id, user.id), gt(tasks.updated_at, lastSynced)))
     }
     if (body.tables.includes('routines')) {
-      changes.routines = await db.select().from(routines).where(and(eq(routines.user_id, user.id), gt(routines.updated_at, lastSynced)))
+      changes.routines = await db.select({
+        id: routines.id,
+        title: routines.title,
+        goal: routines.goal,
+        updated_at: routines.updated_at,
+        deleted_at: routines.deleted_at
+      }).from(routines).where(and(eq(routines.user_id, user.id), gt(routines.updated_at, lastSynced)))
     }
     if (body.tables.includes('task_completions')) {
-      changes.task_completions = await db.select().from(taskCompletions).where(and(eq(taskCompletions.user_id, user.id), gt(taskCompletions.updated_at, lastSynced)))
+      changes.task_completions = await db.select({
+        id: taskCompletions.id,
+        task_id: taskCompletions.task_id,
+        status: taskCompletions.status,
+        completed_at: taskCompletions.completed_at,
+        actual_duration_minutes: taskCompletions.actual_duration_minutes,
+        updated_at: taskCompletions.updated_at
+      }).from(taskCompletions).where(and(eq(taskCompletions.user_id, user.id), gt(taskCompletions.updated_at, lastSynced)))
     }
 
-    const tStones = await db.select().from(tombstones).where(and(eq(tombstones.user_id, user.id), gt(tombstones.deleted_at, lastSynced)))
+    const tStones = await db.select({
+      id: tombstones.id,
+      table_name: tombstones.table_name,
+      record_id: tombstones.record_id,
+      deleted_at: tombstones.deleted_at
+    }).from(tombstones).where(and(eq(tombstones.user_id, user.id), gt(tombstones.deleted_at, lastSynced)))
 
     app.log.info({ user: user.id, last_synced_at: body.last_synced_at }, 'Sync pull dispatched')
     return reply.send({ success: true, data: { changes, tombstones: tStones, server_time: new Date().toISOString() } })

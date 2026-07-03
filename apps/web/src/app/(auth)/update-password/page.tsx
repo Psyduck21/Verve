@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label"
 import { updatePassword } from "../actions"
 import { Icon } from "@/components/ui/Icon"
 import { Loader2, ArrowRight } from "lucide-react"
-import { motion } from "framer-motion"
 
 export default function UpdatePasswordPage() {
     const [isLoading, setIsLoading] = useState(false)
@@ -34,12 +33,7 @@ export default function UpdatePasswordPage() {
     }
 
     return (
-        <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-        >
+        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
             <div className="space-y-1">
                 <h2 className="text-2xl lg:text-3xl font-extrabold text-foreground tracking-tight">Set new password</h2>
                 <p className="text-muted-foreground font-medium text-sm">
@@ -90,6 +84,6 @@ export default function UpdatePasswordPage() {
                     )}
                 </Button>
             </form>
-        </motion.div>
+        </div>
     )
 }

@@ -1,9 +1,8 @@
-"use client"
-
-import { motion } from 'framer-motion'
+// Server Component — no "use client" needed.
 import { Check, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { TypewriterText } from '@/components/ui/TypewriterText'
+import { LandingMotionWrapper } from './LandingMotionWrapper'
 
 const plans = [
   {
@@ -72,12 +71,9 @@ export function Pricing() {
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan, index) => (
-            <motion.div
+            <LandingMotionWrapper
               key={index}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
+              delay={index * 0.1}
               className={`relative bg-card border border-border rounded-2xl p-8 shadow-island-lg ${
                 plan.popular ? 'ring-2 ring-primary' : ''
               }`}
@@ -117,7 +113,7 @@ export function Pricing() {
                 {plan.cta}
                 {plan.name !== "Enterprise" && <ArrowRight size={16} className="inline ml-2" />}
               </Link>
-            </motion.div>
+            </LandingMotionWrapper>
           ))}
         </div>
       </div>

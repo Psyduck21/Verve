@@ -1,7 +1,6 @@
-"use client"
-
-import { motion } from 'framer-motion'
+// Server Component — no "use client" needed.
 import { Star, Quote } from 'lucide-react'
+import { LandingMotionWrapper } from './LandingMotionWrapper'
 
 const testimonials = [
   {
@@ -49,16 +48,15 @@ export function SocialProof() {
           </p>
           <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-12 opacity-60">
             {companies.map((company, index) => (
-              <motion.div
+              <LandingMotionWrapper
                 key={index}
+                delay={index * 0.1}
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 0.6, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
                 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight"
               >
                 {company.logo}
-              </motion.div>
+              </LandingMotionWrapper>
             ))}
           </div>
         </div>
@@ -66,12 +64,9 @@ export function SocialProof() {
         {/* Testimonials */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
-            <motion.div
+            <LandingMotionWrapper
               key={index}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
+              delay={index * 0.1}
               className="bg-card border border-border rounded-2xl p-6 shadow-island-lg"
             >
               <div className="flex gap-1 mb-4">
@@ -96,17 +91,12 @@ export function SocialProof() {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </LandingMotionWrapper>
           ))}
         </div>
 
         {/* Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8"
-        >
+        <LandingMotionWrapper className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8">
           {[
             { value: "10,000+", label: "Active Users" },
             { value: "1M+", label: "Tasks Completed" },
@@ -118,7 +108,7 @@ export function SocialProof() {
               <p className="text-sm text-muted-foreground">{stat.label}</p>
             </div>
           ))}
-        </motion.div>
+        </LandingMotionWrapper>
       </div>
     </section>
   )

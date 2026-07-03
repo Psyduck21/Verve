@@ -56,11 +56,17 @@ export class AIRateLimiter {
     
     const now = Date.now()
     
+    // Atomic rate limit check using Lua script
+    const rateLimitScript = `
+      local current = redis.call('INCR', KEYS[1])
+      if current == 1 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+      end
+      return current
+    `
+
     // Check minute limit
-    const minuteCount = await redis.incr(minuteKey)
-    if (minuteCount === 1) {
-      await redis.expire(minuteKey, 60) // 60 seconds
-    }
+    const minuteCount = await redis.eval(rateLimitScript, [minuteKey], [60]) as number
     
     if (minuteCount > limits.perMinute) {
       const ttl = await redis.ttl(minuteKey)
@@ -68,10 +74,7 @@ export class AIRateLimiter {
     }
     
     // Check hour limit
-    const hourCount = await redis.incr(hourKey)
-    if (hourCount === 1) {
-      await redis.expire(hourKey, 3600) // 1 hour
-    }
+    const hourCount = await redis.eval(rateLimitScript, [hourKey], [3600]) as number
     
     if (hourCount > limits.perHour) {
       const ttl = await redis.ttl(hourKey)

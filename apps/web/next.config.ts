@@ -1,4 +1,5 @@
 import type { NextConfig } from "next"
+import withBundleAnalyzer from "@next/bundle-analyzer"
 
 const nextConfig: NextConfig = {
     transpilePackages: ["@verve/shared"],
@@ -8,7 +9,10 @@ const nextConfig: NextConfig = {
             { protocol: "https", hostname: "avatars.githubusercontent.com" },
             { protocol: "https", hostname: "lh3.googleusercontent.com" },
         ],
-    }
+    },
 }
 
-export default nextConfig
+// Enable bundle analyzer when ANALYZE=true is set
+export default withBundleAnalyzer({
+    enabled: process.env.ANALYZE === "true",
+})(nextConfig)

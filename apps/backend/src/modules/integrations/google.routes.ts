@@ -1,10 +1,12 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { google } from 'googleapis'
+import { syncGoogleCalendar, registerCalendarWebhook } from './google.service'
+import { aiTasksQueue } from '../../lib/queue'
 import { db } from '../../lib/db'
 import { oauthIdentities, users, eq } from '@verve/db'
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'dummy_client_id'
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'dummy_client_secret'
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || ''
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI?.trim() || 'http://localhost:3001/v1/integrations/google/callback'
 
 const oauth2Client = new google.auth.OAuth2(
@@ -36,7 +38,7 @@ export const googleRoutes: FastifyPluginAsync = async (app) => {
   })
 
   // 2. OAuth Callback
-  app.get('/callback', async (req, reply) => {
+  app.get('/callback', { preHandler: [app.authenticate] }, async (req, reply) => {
     const { code, state: stateStr, error } = req.query as any
 
     if (error) {
@@ -58,6 +60,11 @@ export const googleRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const { userId, redirectTo } = state
+
+    // Prevent OAuth token fixation
+    if (userId !== req.user!.id) {
+      return reply.status(403).send({ error: 'OAuth state user ID mismatch' })
+    }
 
     try {
       // Exchange code for tokens
@@ -104,8 +111,8 @@ export const googleRoutes: FastifyPluginAsync = async (app) => {
         })
       }
 
-      // TODO: Register Webhook with Google Calendar to watch for changes
-      // await registerCalendarWebhook(userId, tokens)
+      // Register Webhook with Google Calendar to watch for changes
+      await registerCalendarWebhook(userId, oauth2Client)
 
       // Redirect to the appropriate page based on redirectTo
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
@@ -140,10 +147,19 @@ export const googleRoutes: FastifyPluginAsync = async (app) => {
 
     if (resourceState === 'exists') {
       // A change occurred! We should enqueue a sync job for this user.
-      // For now, we'll log it. We need a background queue or immediate sync.
-      app.log.info(`Change detected for user: ${channelToken}. Enqueueing sync...`)
+      const userId = channelToken // We passed userId in the token
+      app.log.info(`Change detected for user: ${userId}. Enqueueing sync...`)
       
-      // We will implement the actual sync logic in the next step
+      if (userId && typeof userId === 'string') {
+        // Enqueue into a background queue so we don't block the webhook response
+        // and we handle Google's rate limits properly.
+        await aiTasksQueue.add('google-calendar-sync', { userId }, {
+          removeOnComplete: true,
+          removeOnFail: 100,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 1000 }
+        })
+      }
     }
 
     return reply.send({ success: true })

@@ -1,9 +1,8 @@
-"use client"
-
-import { motion } from 'framer-motion'
+// Server Component — no "use client" needed.
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { TypewriterText } from '@/components/ui/TypewriterText'
+import { LandingMotionWrapper } from './LandingMotionWrapper'
 
 export function CTA() {
   return (
@@ -17,12 +16,7 @@ export function CTA() {
       </div>
 
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="space-y-8"
-        >
+        <LandingMotionWrapper className="space-y-8">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-primary-foreground">
             Ready to transform your productivity?
           </h2>
@@ -59,7 +53,7 @@ export function CTA() {
               </div>
             ))}
           </div>
-        </motion.div>
+        </LandingMotionWrapper>
       </div>
     </section>
   )

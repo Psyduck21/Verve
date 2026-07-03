@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useRef, useEffect } from 'react'
+import Image from 'next/image'
 
 interface FeatureVideoProps {
   videoSrc?: string
@@ -25,10 +26,17 @@ export function FeatureVideo({ videoSrc, poster, title, className = '' }: Featur
       {/* Video Player or Placeholder */}
       {videoSrc ? (
         videoSrc.endsWith('.webp') || videoSrc.endsWith('.gif') ? (
-          <img
+          // P4: Use next/image for optimized delivery, with priority since this
+          // is typically displayed above the fold in the Hero section.
+          <Image
             src={videoSrc}
             alt={title || "Feature demonstration"}
+            width={1200}
+            height={675}
+            priority
+            quality={90}
             className="w-full h-auto"
+            unoptimized={videoSrc.endsWith('.gif')} // GIFs must skip optimization to preserve animation
           />
         ) : (
           <video

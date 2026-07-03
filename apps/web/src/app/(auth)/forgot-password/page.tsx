@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label"
 import { resetPassword } from "../actions"
 import { Icon } from "@/components/ui/Icon"
 import { Loader2, ArrowRight, MailCheck, ChevronLeft } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
 
 export default function ForgotPasswordPage() {
     const [isLoading, setIsLoading] = useState(false)
@@ -29,16 +28,9 @@ export default function ForgotPasswordPage() {
     }
 
     return (
-        <AnimatePresence mode="wait">
+        <>
             {!isSuccess ? (
-                <motion.div
-                    key="form"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-6"
-                >
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                     <div className="space-y-1">
                         <Link href="/login" className="inline-flex items-center text-sm font-bold text-muted-foreground hover:text-foreground transition-colors mb-4">
                             <ChevronLeft className="w-4 h-4 mr-1" />
@@ -81,14 +73,9 @@ export default function ForgotPasswordPage() {
                             )}
                         </Button>
                     </form>
-                </motion.div>
+                </div>
             ) : (
-                <motion.div
-                    key="success"
-                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    className="flex flex-col items-center justify-center text-center space-y-6 py-8"
-                >
+                <div className="flex flex-col items-center justify-center text-center space-y-6 py-8 animate-in fade-in zoom-in-95 duration-300">
                     <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-2 border border-primary/20 shadow-[0_0_30px_rgba(var(--primary),0.2)]">
                         <MailCheck className="w-10 h-10 text-primary" />
                     </div>
@@ -103,8 +90,8 @@ export default function ForgotPasswordPage() {
                             Back to login
                         </Link>
                     </div>
-                </motion.div>
+                </div>
             )}
-        </AnimatePresence>
+        </>
     )
 }

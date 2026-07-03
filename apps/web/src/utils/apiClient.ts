@@ -10,7 +10,25 @@ class APIError extends Error {
     }
 }
 
-async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+let cachedCsrfToken: string | null = null
+
+async function getCsrfToken(): Promise<string | null> {
+    if (cachedCsrfToken) return cachedCsrfToken
+    try {
+        const tokenRes = await fetch(`${API_BASE_URL}/v1/csrf-token`, { credentials: 'include' })
+        if (tokenRes.ok) {
+            const tokenJson = await tokenRes.json().catch(() => ({} as any))
+            if (tokenJson?.csrfToken) {
+                cachedCsrfToken = tokenJson.csrfToken
+            }
+        }
+    } catch (err) {
+        // If CSRF token fetch fails, we'll still attempt the request
+    }
+    return cachedCsrfToken
+}
+
+async function fetchWithAuth(endpoint: string, options: RequestInit = {}, retryOnCsrfError = true): Promise<any> {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
 
@@ -24,16 +42,9 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     // For mutation requests (POST/PUT/DELETE), fetch CSRF token from backend and include it
     const method = (options.method || 'GET').toUpperCase()
     if (method !== 'GET') {
-        try {
-            const tokenRes = await fetch(`${API_BASE_URL}/v1/csrf-token`, { credentials: 'include' })
-            if (tokenRes.ok) {
-                const tokenJson = await tokenRes.json().catch(() => ({} as any))
-                if (tokenJson?.csrfToken) {
-                    headers.set('x-csrf-token', tokenJson.csrfToken)
-                }
-            }
-        } catch (err) {
-            // If CSRF token fetch fails, we'll still attempt the request and let the server return 403
+        const token = await getCsrfToken()
+        if (token) {
+            headers.set('x-csrf-token', token)
         }
     }
 
@@ -56,7 +67,13 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new APIError(response.status, errorData.message || response.statusText)
+        
+        if (response.status === 403 && errorData.error === 'Invalid CSRF token' && retryOnCsrfError) {
+            cachedCsrfToken = null
+            return fetchWithAuth(endpoint, options, false)
+        }
+        
+        throw new APIError(response.status, errorData.message || errorData.error || response.statusText)
     }
 
     return response.json()

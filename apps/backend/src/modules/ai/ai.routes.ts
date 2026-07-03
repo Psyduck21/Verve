@@ -6,6 +6,7 @@ import { db } from '../../lib/db'
 import { users } from '@verve/db'
 import { eq } from '@verve/db'
 import { aiRateLimiter } from '../../lib/aiRateLimiter'
+import { aiTasksQueue } from '../../lib/queue'
 
 // Rate limiting middleware factory
 const withAIRateLimit = (endpoint: string) => {
@@ -38,14 +39,32 @@ const withAIRateLimit = (endpoint: string) => {
 
 export const aiRoutes: FastifyPluginAsync = async (app) => {
 
-  // POST /v1/ai/generate-routine
-  app.post('/generate-routine', { preHandler: [app.authenticate, withAIRateLimit('generate-routine')] }, async (req, reply) => {
+  // POST /v1/ai/generate-routine (queued)
+  app.post('/generate-routine', { preHandler: [app.authenticate, app.validateCSRF, withAIRateLimit('generate-routine')] }, async (req, reply) => {
     const user = req.user!
     const body = GenerateRoutineRequestSchema.parse(req.body)
 
     try {
-      const data = await AiService.generateRoutine(user.id, body)
-      return reply.send({ success: true, data })
+      // Add to queue instead of processing synchronously
+      const job = await aiTasksQueue.add('generate-routine', { 
+        userId: user.id, 
+        body,
+        requestId: req.id 
+      }, {
+        priority: 1,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000
+        }
+      })
+      
+      return reply.send({ 
+        success: true, 
+        jobId: job.id,
+        status: 'processing',
+        estimatedWaitTime: 8000 // 8 seconds estimate for routine generation
+      })
     } catch (error: any) {
       if (error.message === 'Daily AI budget exceeded') {
         return reply.status(429).send({ success: false, error: { code: 'RATE_LIMIT', message: error.message } })
@@ -55,14 +74,31 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  // POST /v1/ai/extract-email
-  app.post('/extract-email', { preHandler: [app.authenticate, withAIRateLimit('extract-email')] }, async (req, reply) => {
+  // POST /v1/ai/extract-email (queued)
+  app.post('/extract-email', { preHandler: [app.authenticate, app.validateCSRF, withAIRateLimit('extract-email')] }, async (req, reply) => {
     const user = req.user!
     const body = ExtractEmailRequestSchema.parse(req.body)
 
     try {
-      const data = await AiService.extractEmail(user.id, body)
-      return reply.send({ success: true, data })
+      const job = await aiTasksQueue.add('extract-email', { 
+        userId: user.id, 
+        body,
+        requestId: req.id 
+      }, {
+        priority: 1,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000
+        }
+      })
+      
+      return reply.send({ 
+        success: true, 
+        jobId: job.id,
+        status: 'processing',
+        estimatedWaitTime: 5000
+      })
     } catch (error: any) {
       if (error.message === 'Daily AI budget exceeded') {
         return reply.status(429).send({ success: false, error: { code: 'RATE_LIMIT', message: error.message } })
@@ -72,14 +108,31 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  // POST /v1/ai/reschedule
-  app.post('/reschedule', { preHandler: [app.authenticate, withAIRateLimit('reschedule')] }, async (req, reply) => {
+  // POST /v1/ai/reschedule (queued)
+  app.post('/reschedule', { preHandler: [app.authenticate, app.validateCSRF, withAIRateLimit('reschedule')] }, async (req, reply) => {
     const user = req.user!
     const body = RescheduleRequestSchema.parse(req.body)
 
     try {
-      const data = await AiService.reschedule(user.id, body)
-      return reply.send({ success: true, data })
+      const job = await aiTasksQueue.add('reschedule', { 
+        userId: user.id, 
+        body,
+        requestId: req.id 
+      }, {
+        priority: 1,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000
+        }
+      })
+      
+      return reply.send({ 
+        success: true, 
+        jobId: job.id,
+        status: 'processing',
+        estimatedWaitTime: 5000
+      })
     } catch (error: any) {
       if (error.message === 'Daily AI budget exceeded') {
         return reply.status(429).send({ success: false, error: { code: 'RATE_LIMIT', message: error.message } })
@@ -92,15 +145,32 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  // POST /v1/ai/parse-task
-  app.post('/parse-task', { preHandler: [app.authenticate, withAIRateLimit('parse-task')] }, async (req, reply) => {
+  // POST /v1/ai/parse-task (queued)
+  app.post('/parse-task', { preHandler: [app.authenticate, app.validateCSRF, withAIRateLimit('parse-task')] }, async (req, reply) => {
     const user = req.user!
     const { ParseTaskRequestSchema } = await import('@verve/shared')
     const body = ParseTaskRequestSchema.parse(req.body)
 
     try {
-      const data = await AiService.parseTask(user.id, body)
-      return reply.send({ success: true, data })
+      const job = await aiTasksQueue.add('parse-task', { 
+        userId: user.id, 
+        body,
+        requestId: req.id 
+      }, {
+        priority: 1,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000
+        }
+      })
+      
+      return reply.send({ 
+        success: true, 
+        jobId: job.id,
+        status: 'processing',
+        estimatedWaitTime: 5000
+      })
     } catch (error: any) {
       if (error.message === 'Daily AI budget exceeded') {
         return reply.status(429).send({ success: false, error: { code: 'RATE_LIMIT', message: error.message } })
@@ -110,14 +180,31 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  // POST /v1/ai/omnibox
-  app.post('/omnibox', { preHandler: [app.authenticate, withAIRateLimit('omnibox')] }, async (req, reply) => {
+  // POST /v1/ai/omnibox (queued)
+  app.post('/omnibox', { preHandler: [app.authenticate, app.validateCSRF, withAIRateLimit('omnibox')] }, async (req, reply) => {
     const user = req.user!
     const body = OmniboxRequestSchema.parse(req.body)
 
     try {
-      const data = await AiService.processOmnibox(user.id, body)
-      return reply.send({ success: true, data })
+      const job = await aiTasksQueue.add('omnibox', { 
+        userId: user.id, 
+        body,
+        requestId: req.id 
+      }, {
+        priority: 1,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000
+        }
+      })
+      
+      return reply.send({ 
+        success: true, 
+        jobId: job.id,
+        status: 'processing',
+        estimatedWaitTime: 5000
+      })
     } catch (error: any) {
       if (error.message === 'Daily AI budget exceeded') {
         return reply.status(429).send({ success: false, error: { code: 'RATE_LIMIT', message: error.message } })
@@ -127,7 +214,7 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  app.post('/assistant/plan', { preHandler: [app.authenticate, withAIRateLimit('assistant-plan')] }, async (req, reply) => {
+  app.post('/assistant/plan', { preHandler: [app.authenticate, app.validateCSRF, withAIRateLimit('assistant-plan')] }, async (req, reply) => {
     const user = req.user!
     const body = AssistantPlanRequestSchema.parse(req.body)
 
@@ -157,5 +244,26 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
   app.get('/usage', { preHandler: [app.authenticate] }, async (req, reply) => {
     const dbUser = await db.query.users.findFirst({ where: eq(users.id, req.user!.id) })
     return reply.send({ success: true, data: { requests_used_today: dbUser?.ai_requests_used_today ?? 0, limit: 100 } })
+  })
+
+  // GET /v1/ai/job/:jobId - Check job status
+  app.get('/job/:jobId', { preHandler: [app.authenticate] }, async (req, reply) => {
+    const job = await aiTasksQueue.getJob((req.params as any).jobId)
+    
+    if (!job) {
+      return reply.status(404).send({ success: false, error: 'Job not found' })
+    }
+    
+    const state = await job.getState()
+    const result = state === 'completed' ? job.returnvalue : null
+    const failedReason = state === 'failed' ? job.failedReason : null
+    
+    return reply.send({ 
+      success: true, 
+      status: state,
+      result,
+      failedReason,
+      progress: state === 'completed' ? 100 : state === 'failed' ? 0 : 50
+    })
   })
 }

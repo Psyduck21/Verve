@@ -23,7 +23,7 @@ export const corsPlugin = fp(async (app: FastifyInstance) => {
       const isAllowedUrl = () => {
         try {
           const url = new URL(origin)
-          return ['verve.app', 'vercel.app', 'localhost'].some(domain => 
+          return ['verve.app', 'verve-frontend.vercel.app', 'localhost'].some(domain => 
             url.hostname === domain || url.hostname.endsWith(`.${domain}`)
           ) || origin === 'https://mail.google.com'
         } catch {
