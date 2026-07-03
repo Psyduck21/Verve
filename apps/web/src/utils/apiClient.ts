@@ -148,6 +148,16 @@ export const apiClient = {
                 method: "DELETE",
             })
         },
+        /**
+         * Materialize a virtual recurring occurrence into a real DB row.
+         * Called when the user clicks or drags a projected recurring event on the calendar.
+         */
+        materializeOccurrence: async (masterTaskId: string, scheduledAt: string, estimatedDurationMinutes?: number) => {
+            return fetchWithAuth(`/v1/tasks/${masterTaskId}/materialize`, {
+                method: "POST",
+                body: JSON.stringify({ scheduled_at: scheduledAt, estimated_duration_minutes: estimatedDurationMinutes }),
+            })
+        },
     },
 
     // --- Subtasks Module ---

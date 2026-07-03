@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Calendar as BigCalendar, dateFnsLocalizer, Views } from "react-big-calendar"
 import { format, parse, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay, isWithinInterval, getDay } from "date-fns"
 import { enUS } from "date-fns/locale/en-US"
-import { ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, ArrowUpRight, ArrowDownRight, Clock } from "lucide-react"
+import { ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, ArrowUpRight, ArrowDownRight, Clock, Repeat } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import { useEvents } from "@/hooks/useEvents"
 import { useUpdateTask, useTasks } from "@/hooks/useTasks"
@@ -14,6 +14,7 @@ import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop"
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css"
 import { UnscheduledTasksPanel, draggedTaskPayload } from "./UnscheduledTasksPanel"
 import { EditTaskModal } from "@/components/tasks/EditTaskModal"
+import { RecurrenceEditDialog, type RecurrenceEditMode } from "./RecurrenceEditDialog"
 import { KEYBINDINGS } from "@/config/keybindings"
 import { isHotkey } from "@/utils/keyboard"
 import { cn } from "@/lib/utils"
@@ -42,6 +43,7 @@ function EventBlock({ event, isFocused }: { event: any, isFocused?: boolean }) {
     const task = event.task || {}
     const priority = task.priority || "low"
     const category = task.category || "work"
+    const isVirtual = event.isVirtual === true
 
     const PRIORITY_BORDER_COLORS: Record<string, string> = {
         critical: "border-l-destructive",
@@ -66,8 +68,9 @@ function EventBlock({ event, isFocused }: { event: any, isFocused?: boolean }) {
     const endTime = event.end ? format(new Date(event.end), 'hh:mm') : ''
 
     return (
-        <div className={`h-full overflow-hidden w-full px-1.5 py-1 rounded-sm border-l-4 border-r border-y border-r-border border-y-border text-[11px] leading-tight transition-all duration-200 cursor-pointer flex flex-col justify-start items-start ${containerClass} ${isFocused ? '!border-l-black z-50 relative' : 'hover:shadow-md'}`}>
-            <span className="font-semibold opacity-90 line-clamp-2 mt-0">
+        <div className={`h-full overflow-hidden w-full px-1.5 py-1 rounded-sm border-l-4 border-r border-y border-r-border border-y-border text-[11px] leading-tight transition-all duration-200 cursor-pointer flex flex-col justify-start items-start ${containerClass} ${isFocused ? '!border-l-black z-50 relative' : 'hover:shadow-md'} ${isVirtual ? 'opacity-60 border-dashed' : ''}`}>
+            <span className="font-semibold opacity-90 line-clamp-2 mt-0 flex items-center gap-1">
+                {isVirtual && <Repeat className="w-2.5 h-2.5 shrink-0 opacity-70" />}
                 {startTime}-{endTime} <span className="font-black">{event.title}</span>
             </span>
             {event.description && (
@@ -94,17 +97,35 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
     const [selectedTask, setSelectedTask] = useState<any>(null)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [focusedEventId, setFocusedEventId] = useState<string | null>(null)
+    // Recurrence edit dialog state
+    const [recurrenceDialog, setRecurrenceDialog] = useState<{
+        open: boolean
+        actionLabel: string
+        pendingAction: ((mode: RecurrenceEditMode) => void) | null
+    }>({ open: false, actionLabel: "edit", pendingAction: null })
+    const [isMaterializing, setIsMaterializing] = useState(false)
+    const queryClient = useQueryClient()
 
     const calendarRange = useMemo(() => {
-        return {
-            start: startOfWeek(date),
-            end: endOfWeek(date),
+        let start: Date, end: Date
+        if (view === Views.DAY) {
+            start = startOfDay(date)
+            end = endOfDay(date)
+        } else if (view === Views.MONTH) {
+            start = startOfMonth(date)
+            end = endOfMonth(date)
+        } else {
+            start = startOfWeek(date)
+            end = endOfWeek(date)
         }
-    }, [date])
+        return { start, end }
+    }, [date, view])
 
     const queryParams = useMemo(() => ({
         start_date: calendarRange.start.toISOString(),
         end_date: calendarRange.end.toISOString(),
+        windowStart: calendarRange.start,
+        windowEnd: calendarRange.end,
     }), [calendarRange])
 
     const { events } = useEvents(queryParams)
@@ -337,21 +358,41 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
     const maxTime = new Date()
     maxTime.setHours(Math.min(23, sleepHour + 1), 59, 59, 999)
 
-    const onEventDrop = ({ event, start, end }: any) => {
+    const onEventDrop = useCallback(({ event, start, end }: any) => {
         const taskId = event.task?.id
         if (!taskId) return
-        
-        // Skip optimistic UI and drag action for time-locked tasks
         if (event.task?.is_time_locked) return
 
         const durationMins = Math.round((end.getTime() - start.getTime()) / 60000)
+
+        if (event.isVirtual) {
+            // Google Calendar style: ask which occurrences to move
+            setRecurrenceDialog({
+                open: true,
+                actionLabel: "move",
+                pendingAction: async (mode: RecurrenceEditMode) => {
+                    if (mode === "this") {
+                        // Materialize then update scheduled_at
+                        const res = await apiClient.tasks.materializeOccurrence(event.masterTaskId, event.task.scheduled_at)
+                        if (res.success && res.data) {
+                            updateTask({ id: res.data.id, scheduled_at: start.toISOString(), estimated_duration_minutes: durationMins })
+                            queryClient.invalidateQueries({ queryKey: ["tasks"] })
+                        }
+                    } else if (mode === "all" || mode === "this_and_future") {
+                        // Update the master task's scheduled_at time-of-day
+                        updateTask({ id: event.masterTaskId, scheduled_at: start.toISOString(), estimated_duration_minutes: durationMins })
+                    }
+                }
+            })
+            return
+        }
 
         updateTask({
             id: taskId,
             scheduled_at: start.toISOString(),
             estimated_duration_minutes: durationMins
         })
-    }
+    }, [updateTask, queryClient])
 
     const onEventResize = ({ event, start, end }: any) => {
         const taskId = event.task?.id
@@ -402,12 +443,29 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
         }
     }
 
-    const handleSelectEvent = (event: any) => {
-        if (event.task) {
+    const handleSelectEvent = useCallback(async (event: any) => {
+        if (!event.task) return
+
+        if (event.isVirtual) {
+            // Materialize the virtual occurrence into a real DB row first
+            setIsMaterializing(true)
+            try {
+                const res = await apiClient.tasks.materializeOccurrence(event.masterTaskId, event.start.toISOString())
+                if (res.success && res.data) {
+                    queryClient.invalidateQueries({ queryKey: ["tasks"] })
+                    setSelectedTask(res.data)
+                    setIsEditModalOpen(true)
+                }
+            } catch (e) {
+                console.error("Failed to materialize occurrence:", e)
+            } finally {
+                setIsMaterializing(false)
+            }
+        } else {
             setSelectedTask(event.task)
             setIsEditModalOpen(true)
         }
-    }
+    }, [queryClient])
 
     const timeblockDate = selectedDate || date
 
@@ -588,6 +646,26 @@ export default function CalendarView({ selectedDate, onSelectedDateChange }: Cal
                 }} 
                 task={selectedTask} 
             />
+
+            {/* Google Calendar-style dialog for recurring event edits */}
+            <RecurrenceEditDialog
+                open={recurrenceDialog.open}
+                actionLabel={recurrenceDialog.actionLabel}
+                onClose={() => setRecurrenceDialog(d => ({ ...d, open: false, pendingAction: null }))}
+                onConfirm={(mode) => {
+                    recurrenceDialog.pendingAction?.(mode)
+                }}
+            />
+
+            {/* Loading overlay while materializing a virtual occurrence */}
+            {isMaterializing && (
+                <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+                    <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-xl flex items-center gap-3 text-sm font-medium text-foreground">
+                        <Repeat className="w-4 h-4 animate-spin text-primary" />
+                        Opening task...
+                    </div>
+                </div>
+            )}
 
         </div>
     )

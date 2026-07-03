@@ -4,8 +4,8 @@ import { TasksService, CreateSubtaskSchema } from './tasks.service'
 import { sanitizeHtml } from '../../lib/sanitize'
 import { db } from '../../lib/db'
 import { tasks } from '@verve/db'
-import { eq, desc, lt, gt, gte, lte, and, isNull } from '@verve/db'
-import { taskExternalMetadata } from '@verve/db'
+import { eq, desc, lt, gte, lte, and, isNull, or, isNotNull } from '@verve/db'
+import { taskExternalMetadata, taskRecurrences } from '@verve/db'
 import { TaskListQuerySchema } from './tasks.routes.validation'
 const CreateTaskSchema = z.object({
   routine_id: z.string().uuid().nullable().optional(),
@@ -48,29 +48,47 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ success: false, error: 'start_date must be before or equal to end_date' })
     }
     
-    // Build query with optional date range filters and cursor-based pagination
-    const conditions: any[] = [eq(tasks.user_id, user.id), isNull(tasks.parent_task_id)]
+    // Build conditions for non-recurring tasks (respect date window)
+    // Recurring master tasks (those with a recurrence_rule) are ALWAYS returned
+    // regardless of start_date/end_date — the frontend projects their virtual occurrences.
+    const baseConditions: any[] = [eq(tasks.user_id, user.id), isNull(tasks.parent_task_id)]
     if (cursor) {
-      conditions.push(lt(tasks.scheduled_at, new Date(cursor)))
+      baseConditions.push(lt(tasks.scheduled_at, new Date(cursor)))
     }
-    if (start_date) {
-      conditions.push(gte(tasks.scheduled_at, start_date))
-    }
-    if (end_date) {
-      conditions.push(lte(tasks.scheduled_at, end_date))
-    }
-    
+
+    const nonRecurringConditions = [...baseConditions]
+    if (start_date) nonRecurringConditions.push(gte(tasks.scheduled_at, start_date))
+    if (end_date) nonRecurringConditions.push(lte(tasks.scheduled_at, end_date))
+
+    // Query: fetch tasks that either (a) fall in the date window (non-recurring)
+    //        or (b) have a recurrence rule (master tasks, always included)
     const results = await db
       .select()
       .from(tasks)
       .leftJoin(taskExternalMetadata, eq(tasks.id, taskExternalMetadata.task_id))
-      .where(and(...conditions))
+      .leftJoin(taskRecurrences, eq(tasks.id, taskRecurrences.task_id))
+      .where(
+        and(
+          eq(tasks.user_id, user.id),
+          isNull(tasks.parent_task_id),
+          cursor ? lt(tasks.scheduled_at, new Date(cursor)) : undefined,
+          // Include task if it has a recurrence rule OR falls within date range
+          or(
+            isNotNull(taskRecurrences.id),
+            and(
+              start_date ? gte(tasks.scheduled_at, start_date) : undefined,
+              end_date ? lte(tasks.scheduled_at, end_date) : undefined
+            )
+          )
+        )
+      )
       .orderBy(desc(tasks.scheduled_at))
       .limit(limit + 1) // Fetch one extra to determine if there's a next page
     
     const flattenedResults = results.map(row => ({
       ...row.tasks,
-      external_provider: row.task_external_metadata?.external_provider || null
+      external_provider: row.task_external_metadata?.external_provider || null,
+      recurrence_rule: row.task_recurrences?.recurrence_rule || null,
     }))
 
     const hasMore = flattenedResults.length > limit
@@ -253,6 +271,34 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to complete subtasks'
       return reply.status(400).send({ success: false, error: message })
+    }
+  })
+
+  // MATERIALIZE A VIRTUAL RECURRING OCCURRENCE
+  // Called when the user clicks/drags a virtual (projected) recurring task on the calendar.
+  // Creates a real DB row (recurrence exception) linked to the master task via parent_task_id.
+  app.post('/:id/materialize', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
+    const user = req.user!
+    const { id: masterTaskId } = req.params as { id: string }
+
+    const MaterializeSchema = z.object({
+      scheduled_at: z.string().datetime({ offset: true }),
+      estimated_duration_minutes: z.number().optional(),
+    })
+
+    const parsed = MaterializeSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ success: false, error: parsed.error.issues })
+    }
+
+    try {
+      const task = await TasksService.materializeOccurrence(user.id, masterTaskId, parsed.data.scheduled_at, parsed.data.estimated_duration_minutes)
+      return reply.status(201).send({ success: true, data: task })
+    } catch (e: any) {
+      if (e.message.includes('not found')) {
+        return reply.status(404).send({ success: false, error: e.message })
+      }
+      throw e
     }
   })
 }

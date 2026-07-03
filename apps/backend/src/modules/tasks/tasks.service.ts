@@ -271,6 +271,54 @@ export class TasksService {
     return updatedTask
   }
 
+  /**
+   * Materialize a virtual recurring occurrence into a real DB row.
+   * Called when the user interacts with a projected virtual event on the calendar.
+   * The new task is a "recurrence exception" — a child of the master task.
+   */
+  static async materializeOccurrence(userId: string, masterTaskId: string, scheduledAt: string, estimatedDurationMinutes?: number) {
+    // Fetch the master task to copy its metadata
+    const [master] = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.id, masterTaskId), eq(tasks.user_id, userId)))
+      .limit(1)
+
+    if (!master) throw new Error('Master task not found or unauthorized')
+
+    // Check if a real occurrence already exists for this exact date (idempotent)
+    const scheduledDate = new Date(scheduledAt)
+    const existingChild = await db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.parent_task_id, masterTaskId),
+          eq(tasks.scheduled_at, scheduledDate)
+        )
+      )
+      .limit(1)
+
+    if (existingChild.length > 0) {
+      // Already materialized — return the existing task
+      const [existing] = await db.select().from(tasks).where(eq(tasks.id, existingChild[0].id)).limit(1)
+      return existing
+    }
+
+    // Create the real occurrence as a child of the master task
+    return this.createTask(userId, {
+      title: master.title,
+      description: master.description,
+      priority: master.priority,
+      category: master.category,
+      estimated_duration_minutes: estimatedDurationMinutes ?? master.estimated_duration_minutes,
+      scheduled_at: scheduledAt,
+      routine_id: master.routine_id,
+      parent_task_id: masterTaskId,
+      status: 'not_started',
+    })
+  }
+
   static async deleteTask(userId: string, taskId: string) {
     const result = await db.transaction(async (tx) => {
       const deleted = await tx

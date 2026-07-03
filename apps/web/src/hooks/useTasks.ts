@@ -8,6 +8,7 @@ export type Task = {
     id: string
     routine_id: string | null
     user_id: string
+    parent_task_id: string | null
     title: string
     description: string | null
     priority: "critical" | "high" | "medium" | "low"
@@ -138,6 +139,7 @@ export function useCreateTask() {
                 id: `temp-${Date.now()}`,
                 routine_id: null,
                 user_id: "optimistic",
+                parent_task_id: null,
                 title: newTask.title,
                 description: newTask.description || null,
                 priority: newTask.priority || "medium",
