@@ -4,11 +4,5 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "pnpm install",
-  "devCommand": "pnpm --filter=@verve/web dev",
-  "crons": [
-    {
-      "path": "/api/cron/keep-alive",
-      "schedule": "*/14 * * * *"
-    }
-  ]
+  "devCommand": "pnpm --filter=@verve/web dev"
 }

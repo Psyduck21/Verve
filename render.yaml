@@ -31,9 +31,9 @@ services:
 
   - type: cron
     name: verve-keep-alive
-    runtime: image
-    image: curlimages/curl
+    runtime: node
     plan: free
     region: singapore
     schedule: "*/14 * * * *"
-    startCommand: "curl -s https://verve-backend-iwzb.onrender.com/health"
+    buildCommand: ""
+    startCommand: "node -e \"fetch('https://verve-backend-iwzb.onrender.com/health')\""
