@@ -11,7 +11,7 @@ import { AIConfirmModal } from "./AIConfirmModal"
 import {
     Sparkles, Calendar, Tag, AlertCircle, CornerDownLeft, ArrowUp, ArrowDown,
     Clock, AlignLeft, Lock, Loader2, LayoutDashboard, Settings, Download, LogOut,
-    Moon, Sun, Monitor, RefreshCcw, Plus, ArrowRight, Wand2
+    Moon, Sun, Monitor, RefreshCcw, Plus, ArrowRight, Wand2, X
 } from "lucide-react"
 import { KEYBINDINGS } from "@/config/keybindings"
 import { isHotkey } from "@/utils/keyboard"
@@ -104,6 +104,7 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
 
     const [aiPlanToConfirm, setAiPlanToConfirm] = useState<any[] | null>(null)
     const [isConfirmingAIPlan, setIsConfirmingAIPlan] = useState(false)
+    const [aiError, setAiError] = useState<string | null>(null)
 
     // Derived states
     const isCommand = mode === "command"
@@ -142,6 +143,7 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
             setIsSubmitting(false)
             setAiMode(initialMode === "ai")
             setSelectedRoutineId(null)
+            setAiError(null)
             setTimeout(() => inputRef.current?.focus(), 50)
         }
     }, [open, initialMode])
@@ -286,20 +288,61 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
         }
     }
 
+    // Shared executor — used by both immediate CREATE path and confirm dialog path
+    const executeAIPlan = async (actions: any[]) => {
+        await Promise.all(actions.map(async (action: any) => {
+            if (action.action === "CREATE") {
+                await createTaskMutation.mutateAsync({
+                    title: action.new_title,
+                    scheduled_at: action.new_scheduled_at || null,
+                    priority: action.new_priority || "medium",
+                    estimated_duration_minutes: action.new_duration_minutes || 30,
+                    status: "not_started",
+                    description: action.description || action.new_description,
+                    category: action.category || action.new_category,
+                    is_time_locked: action.is_time_locked ?? action.new_is_time_locked ?? false,
+                    recurrence_rule: action.recurrence_rule,
+                })
+            } else if (action.action === "MOVE" || action.action === "UPDATE") {
+                if (action.task_id) {
+                    const updates: any = { id: action.task_id }
+                    if (action.new_scheduled_at) updates.scheduled_at = action.new_scheduled_at
+                    if (action.new_title) updates.title = action.new_title
+                    if (action.new_priority) updates.priority = action.new_priority
+                    if (action.new_duration_minutes) updates.estimated_duration_minutes = action.new_duration_minutes
+                    await updateTask.mutateAsync(updates)
+                }
+            } else if (action.action === "CANCEL") {
+                console.warn("AI returned CANCEL action. Skipping cancellation to preserve the task unless user explicitly confirms.")
+            }
+        }))
+    }
+
     const runAICommand = async (command: string) => {
         setIsSubmitting(true)
+        setAiError(null)
         try {
             const localTimeString = new Date().toString()
             const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
             const res = await apiClient.ai.omnibox(command, tasks, localTimeString, timezone)
             if (res.success && res.data) {
-                setAiPlanToConfirm(res.data)
+                const actions: any[] = res.data
+                // Pure CREATE actions need no confirmation — just execute immediately
+                const isCreateOnly = actions.every((a: any) => a.action === "CREATE")
+                if (isCreateOnly) {
+                    await executeAIPlan(actions)
+                    handleClose()
+                } else {
+                    // MOVE/UPDATE/mixed — show confirm dialog so user can review changes to existing tasks
+                    setAiPlanToConfirm(actions)
+                    // Don't close UniversalModal - just hide its content when showing confirmation dialog
+                }
             } else {
-                handleClose()
+                setAiError("AI processing failed. Please try again.")
             }
         } catch (err) {
             console.error("AI omnibox error:", err)
-            handleClose()
+            setAiError(err instanceof Error ? err.message : "AI processing failed. Please try again.")
         } finally {
             setIsSubmitting(false)
         }
@@ -308,36 +351,14 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
     const handleConfirmAIPlan = async () => {
         if (!aiPlanToConfirm) return
         setIsConfirmingAIPlan(true)
+        setAiError(null)
         try {
-            await Promise.all(aiPlanToConfirm.map(async (action: any) => {
-                if (action.action === "CREATE") {
-                    await createTaskMutation.mutateAsync({
-                        title: action.new_title,
-                        scheduled_at: action.new_scheduled_at || null,
-                        priority: action.new_priority || "medium",
-                        estimated_duration_minutes: action.new_duration_minutes || 30,
-                        status: "not_started",
-                        description: action.description || action.new_description,
-                        category: action.category || action.new_category,
-                        is_time_locked: action.is_time_locked ?? action.new_is_time_locked ?? false,
-                        recurrence_rule: action.recurrence_rule,
-                    })
-                } else if (action.action === "MOVE" || action.action === "UPDATE") {
-                    if (action.task_id) {
-                        const updates: any = { id: action.task_id }
-                        if (action.new_scheduled_at) updates.scheduled_at = action.new_scheduled_at
-                        if (action.new_title) updates.title = action.new_title
-                        if (action.new_priority) updates.priority = action.new_priority
-                        if (action.new_duration_minutes) updates.estimated_duration_minutes = action.new_duration_minutes
-                        await updateTask.mutateAsync(updates)
-                    }
-                } else if (action.action === "CANCEL") {
-                    console.warn("AI returned CANCEL action. Skipping cancellation to preserve the task unless user explicitly confirms.")
-                }
-            }))
-            handleClose()
+            await executeAIPlan(aiPlanToConfirm)
+            handleClose() // Close on success
         } catch (error) {
             console.error("Error executing AI plan:", error)
+            setAiError(error instanceof Error ? error.message : "Failed to execute AI plan. Please try again.")
+            // Don't close on error so user can see the error message
         } finally {
             setIsConfirmingAIPlan(false)
             setAiPlanToConfirm(null)
@@ -447,12 +468,15 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
     }
 
     if (!open) return null
+    
+    // Hide UniversalModal content when showing AI confirmation dialog
+    const showConfirmationModal = !!aiPlanToConfirm
 
     const liveParsed = parseInput(input)
 
     return (
         <AnimatePresence>
-            {open && (
+            {open && !showConfirmationModal && (
                 <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh]">
                     {/* Backdrop */}
                     <motion.div
@@ -543,6 +567,22 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
                             />
                             {isSubmitting && <Loader2 size={18} className="text-primary animate-spin shrink-0" />}
                         </div>
+
+                        {/* Error Message */}
+                        {aiError && (
+                            <div className="px-4 pb-2">
+                                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+                                    <AlertCircle size={16} />
+                                    <span>{aiError}</span>
+                                    <button
+                                        onClick={() => setAiError(null)}
+                                        className="ml-auto text-red-500/60 hover:text-red-500"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* ── TASK MODE ── */}
                         {mode === "task" && (
@@ -748,7 +788,8 @@ export function UniversalModal({ open, initialMode = "task", onClose }: Universa
                 onConfirm={handleConfirmAIPlan}
                 onClose={() => {
                     setAiPlanToConfirm(null)
-                    handleClose()
+                    setAiError(null)
+                    handleClose() // Close UniversalModal when confirmation dialog is cancelled
                 }}
             />
         </AnimatePresence>

@@ -23,7 +23,9 @@ import {
     ChevronRight,
     MoreHorizontal,
     Play,
-    Pause
+    Pause,
+    AlertCircle,
+    X
 } from "lucide-react"
 import { Icon } from "@/components/ui/Icon"
 import { cn } from "@/lib/utils"
@@ -188,17 +190,22 @@ export function DashboardContent({ user }: { user?: any }) {
     const [aiPlanToConfirm, setAiPlanToConfirm] = useState<any[] | null>(null)
     const [isConfirmingAIPlan, setIsConfirmingAIPlan] = useState(false)
     const [confirmingSuggestionId, setConfirmingSuggestionId] = useState<string | null>(null)
+    const [aiError, setAiError] = useState<string | null>(null)
 
     const executeSuggestion = async (id: string, text: string) => {
         setLoadingId(id)
+        setAiError(null)
         try {
             const res = await apiClient.ai.rescheduleTasks(text, todaysTasks)
             if (res.success && res.data) {
                 setAiPlanToConfirm(res.data)
                 setConfirmingSuggestionId(id)
+            } else {
+                setAiError("AI processing failed. Please try again.")
             }
         } catch (error) {
             console.error("AI execution failed:", error)
+            setAiError(error instanceof Error ? error.message : "AI processing failed. Please try again.")
         } finally {
             setLoadingId(null)
         }
@@ -207,6 +214,8 @@ export function DashboardContent({ user }: { user?: any }) {
     const handleConfirmAIPlan = async () => {
         if (!aiPlanToConfirm) return
         setIsConfirmingAIPlan(true)
+        setAiError(null)
+        let executionError = false
         try {
             await Promise.all(aiPlanToConfirm.map(async (action: any) => {
                 if ((action.action === "MOVE" || action.action === "UPDATE") && action.task_id) {
@@ -223,6 +232,8 @@ export function DashboardContent({ user }: { user?: any }) {
             }
         } catch (error) {
             console.error("Error executing AI plan:", error)
+            setAiError(error instanceof Error ? error.message : "Failed to execute AI plan. Please try again.")
+            executionError = true
         } finally {
             setIsConfirmingAIPlan(false)
             setAiPlanToConfirm(null)
@@ -616,8 +627,32 @@ export function DashboardContent({ user }: { user?: any }) {
                 onClose={() => {
                     setAiPlanToConfirm(null)
                     setConfirmingSuggestionId(null)
+                    setAiError(null)
                 }}
             />
+
+            {/* AI Error Toast */}
+            <AnimatePresence>
+                {aiError && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="fixed bottom-6 right-6 z-[200] max-w-md"
+                    >
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 shadow-lg">
+                            <AlertCircle size={20} />
+                            <span className="flex-1 text-sm font-medium">{aiError}</span>
+                            <button
+                                onClick={() => setAiError(null)}
+                                className="text-red-500/60 hover:text-red-500"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

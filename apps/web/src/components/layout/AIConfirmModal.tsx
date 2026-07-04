@@ -1,7 +1,19 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { Sparkles, X, Check, ArrowRight, Clock, Calendar } from "lucide-react"
+import { useEffect } from "react"
 
 export function AIConfirmModal({ open, actions, tasks, onClose, onConfirm, isSubmitting }: { open: boolean, actions: any[], tasks: any[], onClose: () => void, onConfirm: () => void, isSubmitting: boolean }) {
+    // ESC key handler
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && !isSubmitting) onClose()
+        }
+        if (open) {
+            window.addEventListener('keydown', handleEsc)
+            return () => window.removeEventListener('keydown', handleEsc)
+        }
+    }, [open, isSubmitting, onClose])
+
     if (!open) return null
 
     return (
@@ -10,13 +22,17 @@ export function AIConfirmModal({ open, actions, tasks, onClose, onConfirm, isSub
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+                className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+                onClick={(e) => {
+                    if (e.target === e.currentTarget && !isSubmitting) onClose()
+                }}
             >
                 <motion.div
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
                     className="w-full max-w-lg overflow-hidden bg-card border border-border shadow-2xl rounded-3xl"
+                    onClick={(e) => e.stopPropagation()}
                 >
                     <div className="p-6 space-y-6">
                         <div className="flex items-center justify-between">
