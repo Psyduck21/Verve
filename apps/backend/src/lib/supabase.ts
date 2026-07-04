@@ -28,9 +28,11 @@ const jwtSecret = new TextEncoder().encode(process.env.SUPABASE_JWT_SECRET)
 export async function verifySupabaseJWT(token: string) {
   try {
     // Verify JWT locally - no network call (100-300ms faster)
+    // Supabase uses HS256 algorithm, so we need to specify it explicitly
     const { payload } = await jwtVerify(token, jwtSecret, {
       issuer: process.env.SUPABASE_URL,
       audience: 'authenticated',
+      algorithms: ['HS256'],
     })
 
     return {

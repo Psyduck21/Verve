@@ -16,7 +16,9 @@ export const connection = REDIS_URL ? new Redis(REDIS_URL, {
   // Suppress BullMQ eviction policy warnings for Upstash Redis
   // Upstash uses 'optimistic-volatile' which is acceptable for their managed service
   enableReadyCheck: false,
-}) : new Redis({ maxRetriesPerRequest: null, enableReadyCheck: false })
+  enableOfflineQueue: false,
+  lazyConnect: true,
+}) : new Redis({ maxRetriesPerRequest: null, enableReadyCheck: false, enableOfflineQueue: false, lazyConnect: true })
 
 export const QUEUE_NAMES = {
   NOTIFICATIONS: 'notifications-queue',
