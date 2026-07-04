@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { jwtVerify, createRemoteJWKSet, importJWK } from 'jose'
 import WebSocket from 'ws'
 import { logger } from './logger'
 
@@ -20,22 +21,35 @@ export const supabase = createClient(
   }
 )
 
-// Use Supabase's built-in JWT verification to handle different algorithms properly
+// Cache for JWKS (JSON Web Key Set) to avoid repeated network calls
+let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null
+
+// Get or create JWKS cache
+function getJWKS() {
+  if (!jwksCache) {
+    // Supabase exposes JWKS at /.well-known/jwks.json
+    const jwksUrl = `${process.env.SUPABASE_URL}/.well-known/jwks.json`
+    jwksCache = createRemoteJWKSet(new URL(jwksUrl))
+  }
+  return jwksCache
+}
+
+// Optimized: Local JWT verification using Supabase's JWKS
 export async function verifySupabaseJWT(token: string) {
   try {
-    const { data, error } = await supabase.auth.getUser(token)
-    
-    if (error || !data.user) {
-      logger.error('[Auth] JWT verify failed', error as Error)
-      return null
-    }
+    // Verify JWT locally using Supabase's public keys (JWKS)
+    // This handles RS256/ES256 algorithms correctly with proper key types
+    const { payload } = await jwtVerify(token, getJWKS(), {
+      issuer: process.env.SUPABASE_URL,
+      audience: 'authenticated',
+    })
 
     return {
-      id: data.user.id,
-      email: data.user.email,
-      role: data.user.role,
-      app_metadata: data.user.app_metadata,
-      user_metadata: data.user.user_metadata,
+      id: payload.sub as string,
+      email: payload.email as string,
+      role: payload.role,
+      app_metadata: payload.app_metadata,
+      user_metadata: payload.user_metadata,
     }
   } catch (err: any) {
     logger.error('[Auth] JWT verify failed', err as Error)
