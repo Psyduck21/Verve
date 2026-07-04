@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm install -g pnpm && pnpm install && pnpm --filter=@verve/backend build
+    buildCommand: npm install -g pnpm && pnpm install --no-frozen-lockfile && pnpm --filter=@verve/backend build
     startCommand: pnpm --filter=@verve/backend start
     healthCheckPath: /health
     envVars:

@@ -6,6 +6,8 @@ import { redis, RedisKeys } from '../../lib/redis'
 import { CacheService } from '../../lib/cache'
 import { realtimeService } from '../../lib/realtime'
 import { notificationQueue } from '../../lib/queue'
+import { validateRecurrenceRule, standardizeRecurrenceRule } from '../../lib/recurrenceValidation'
+import { RECURRENCE_CONSTANTS } from '../../lib/constants'
 
 export const CreateSubtaskSchema = z.object({
   title: z.string().min(1).max(200),
@@ -55,7 +57,7 @@ export class TasksService {
     if (!scheduledAt) return;
     
     // Check if the scheduled time is in the future
-    const notifyTime = new Date(scheduledAt.getTime() - 15 * 60000)
+    const notifyTime = new Date(scheduledAt.getTime() - RECURRENCE_CONSTANTS.NOTIFICATION_ADVANCE_MINUTES * 60000)
     if (notifyTime <= new Date()) return;
     
     const subs = await tx.select().from(webPushSubscriptions).where(and(eq(webPushSubscriptions.user_id, userId), eq(webPushSubscriptions.active, true)))
@@ -68,7 +70,7 @@ export class TasksService {
       subscription_id: sub.id,
       scheduled_for: notifyTime,
       title: 'Upcoming Task',
-      body: `"${taskTitle}" starts in 15 minutes.`,
+      body: `"${taskTitle}" starts in ${RECURRENCE_CONSTANTS.NOTIFICATION_ADVANCE_MINUTES} minutes.`,
     })))
   }
 
@@ -134,10 +136,18 @@ export class TasksService {
       const createdTask = result[0]
 
       if (recurrence_rule) {
+        // Validate and standardize recurrence rule
+        const standardizedRule = standardizeRecurrenceRule(recurrence_rule)
+        const validation = await validateRecurrenceRule(standardizedRule)
+        
+        if (!validation.valid) {
+          throw new Error(`Invalid recurrence rule: ${validation.error}`)
+        }
+        
         await tx.insert(taskRecurrences).values({
           task_id: createdTask.id,
           user_id: userId,
-          recurrence_rule,
+          recurrence_rule: standardizedRule,
           recurrence_parent_id
         })
       }
@@ -235,17 +245,32 @@ export class TasksService {
 
       // Handle recurrences
       if (recurrence_rule !== undefined) {
-        if (existingRecurrence.length > 0) {
-          await tx.update(taskRecurrences)
-            .set({ recurrence_rule, recurrence_parent_id, updated_at: new Date() })
-            .where(eq(taskRecurrences.task_id, taskId))
-        } else if (recurrence_rule) {
-          await tx.insert(taskRecurrences).values({
-            task_id: taskId,
-            user_id: userId,
-            recurrence_rule,
-            recurrence_parent_id
-          })
+        if (recurrence_rule) {
+          // Validate and standardize recurrence rule
+          const standardizedRule = standardizeRecurrenceRule(recurrence_rule)
+          const validation = await validateRecurrenceRule(standardizedRule)
+          
+          if (!validation.valid) {
+            throw new Error(`Invalid recurrence rule: ${validation.error}`)
+          }
+          
+          if (existingRecurrence.length > 0) {
+            await tx.update(taskRecurrences)
+              .set({ recurrence_rule: standardizedRule, recurrence_parent_id, updated_at: new Date() })
+              .where(eq(taskRecurrences.task_id, taskId))
+          } else {
+            await tx.insert(taskRecurrences).values({
+              task_id: taskId,
+              user_id: userId,
+              recurrence_rule: standardizedRule,
+              recurrence_parent_id
+            })
+          }
+        } else {
+          // Removing recurrence rule
+          if (existingRecurrence.length > 0) {
+            await tx.delete(taskRecurrences).where(eq(taskRecurrences.task_id, taskId))
+          }
         }
       }
 
