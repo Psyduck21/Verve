@@ -245,6 +245,21 @@ export const apiClient = {
 
     // --- AI Module ---
     ai: {
+        /**
+         * Polls /v1/ai/job/:jobId until the job completes or fails.
+         * BullMQ jobs are async — all AI endpoints return a jobId immediately.
+         * This helper turns that into a promise that resolves with the job result.
+         */
+        pollJobResult: async (jobId: string, maxWaitMs = 30000, intervalMs = 800): Promise<any> => {
+            const deadline = Date.now() + maxWaitMs
+            while (Date.now() < deadline) {
+                const res = await fetchWithAuth(`/v1/ai/job/${jobId}`)
+                if (res.status === 'completed') return { success: true, data: res.result }
+                if (res.status === 'failed') throw new APIError(500, res.failedReason || 'AI job failed')
+                await new Promise(r => setTimeout(r, intervalMs))
+            }
+            throw new APIError(504, 'AI job timed out after 30s')
+        },
         generateRoutine: async (data: any) => {
             return fetchWithAuth("/v1/ai/generate-routine", {
                 method: "POST",

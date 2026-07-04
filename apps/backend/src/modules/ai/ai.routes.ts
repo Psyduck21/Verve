@@ -145,32 +145,15 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  // POST /v1/ai/parse-task (queued)
+  // POST /v1/ai/parse-task (synchronous — fast AI call, ~2-5s, no need for queue)
   app.post('/parse-task', { preHandler: [app.authenticate, app.validateCSRF, withAIRateLimit('parse-task')] }, async (req, reply) => {
     const user = req.user!
     const { ParseTaskRequestSchema } = await import('@verve/shared')
     const body = ParseTaskRequestSchema.parse(req.body)
 
     try {
-      const job = await aiTasksQueue.add('parse-task', { 
-        userId: user.id, 
-        body,
-        requestId: req.id 
-      }, {
-        priority: 1,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000
-        }
-      })
-      
-      return reply.send({ 
-        success: true, 
-        jobId: job.id,
-        status: 'processing',
-        estimatedWaitTime: 5000
-      })
+      const data = await AiService.parseTask(user.id, body)
+      return reply.send({ success: true, data })
     } catch (error: any) {
       if (error.message === 'Daily AI budget exceeded') {
         return reply.status(429).send({ success: false, error: { code: 'RATE_LIMIT', message: error.message } })
@@ -180,31 +163,14 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     }
   })
 
-  // POST /v1/ai/omnibox (queued)
+  // POST /v1/ai/omnibox (synchronous — user is actively waiting for the result)
   app.post('/omnibox', { preHandler: [app.authenticate, app.validateCSRF, withAIRateLimit('omnibox')] }, async (req, reply) => {
     const user = req.user!
     const body = OmniboxRequestSchema.parse(req.body)
 
     try {
-      const job = await aiTasksQueue.add('omnibox', { 
-        userId: user.id, 
-        body,
-        requestId: req.id 
-      }, {
-        priority: 1,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000
-        }
-      })
-      
-      return reply.send({ 
-        success: true, 
-        jobId: job.id,
-        status: 'processing',
-        estimatedWaitTime: 5000
-      })
+      const data = await AiService.processOmnibox(user.id, body)
+      return reply.send({ success: true, data })
     } catch (error: any) {
       if (error.message === 'Daily AI budget exceeded') {
         return reply.status(429).send({ success: false, error: { code: 'RATE_LIMIT', message: error.message } })
