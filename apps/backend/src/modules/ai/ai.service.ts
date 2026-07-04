@@ -147,6 +147,10 @@ STRICT RULES:
         schema: IntentGraphSchema,
       })
 
+      if (!aiResponse || !aiResponse.data) {
+        throw new Error('AI response is invalid or missing data')
+      }
+
       const validTaskIds = new Set(userTasks.map(t => t.id))
       const timeLockedTaskIds = new Set(userTasks.filter(t => t.is_time_locked).map(t => t.id))
       
@@ -200,6 +204,10 @@ Current Context: ${JSON.stringify(body.context.tasks)}`
         userPrompt,
         schema: IntentGraphSchema,
       })
+
+      if (!aiResponse || !aiResponse.data) {
+        throw new Error('AI response is invalid or missing data')
+      }
 
       const validTaskIds = new Set(body.context.tasks.map(t => t.id))
       const timeLockedTaskIds = new Set(body.context.tasks.filter(t => t.is_time_locked).map(t => t.id))

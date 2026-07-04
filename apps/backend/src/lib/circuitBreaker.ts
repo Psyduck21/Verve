@@ -20,7 +20,9 @@ export function createCircuitBreaker<T extends (...args: any[]) => any>(
 
 // Create a single shared circuit breaker instance to prevent memory leaks
 const sharedBreaker = createCircuitBreaker(
-  async () => { /* placeholder function */ },
+  async (fn: () => Promise<any>) => {
+    return await fn()
+  },
   {
     timeout: 15000,
     errorThresholdPercentage: 50,

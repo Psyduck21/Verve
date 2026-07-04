@@ -11,7 +11,18 @@ export async function validateRecurrenceRule(rule: string): Promise<{ valid: boo
 
   try {
     const RRule = await getRRule()
-    const parsed = RRule.fromString(rule)
+    
+    // Handle different RRule module structures
+    let parsed
+    if (typeof RRule.fromString === 'function') {
+      parsed = RRule.fromString(rule)
+    } else if (RRule.RRule && typeof RRule.RRule.fromString === 'function') {
+      parsed = RRule.RRule.fromString(rule)
+    } else if (RRule.default && typeof RRule.default.fromString === 'function') {
+      parsed = RRule.default.fromString(rule)
+    } else {
+      return { valid: false, error: 'RRule module structure not recognized' }
+    }
     
     if (!parsed || typeof parsed.origOptions === 'undefined') {
       return { valid: false, error: 'Invalid RRule format' }

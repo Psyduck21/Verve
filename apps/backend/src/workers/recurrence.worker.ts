@@ -75,7 +75,8 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
             return { success: false, error: 'RRule library not available' }
           }
         
-          if (!RRule || typeof RRule.fromString !== 'function') {
+          // RRule module might be in different structures, handle them all
+          if (!RRule) {
             app.log.error('RRule library is not properly loaded')
             return { success: false, error: 'RRule library not properly loaded' }
           }
@@ -87,7 +88,24 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
               // Use cached rule if available
               const cachedRule = ruleCache.get(ruleKey)
               if (!cachedRule) {
-                const parsedRule = RRule.fromString(ruleKey)
+                // Handle different RRule module structures
+                let parsedRule
+                let RRuleConstructor
+                
+                if (typeof RRule.fromString === 'function') {
+                  parsedRule = RRule.fromString(ruleKey)
+                  RRuleConstructor = RRule
+                } else if (RRule.RRule && typeof RRule.RRule.fromString === 'function') {
+                  parsedRule = RRule.RRule.fromString(ruleKey)
+                  RRuleConstructor = RRule.RRule
+                } else if (RRule.default && typeof RRule.default.fromString === 'function') {
+                  parsedRule = RRule.default.fromString(ruleKey)
+                  RRuleConstructor = RRule.default
+                } else {
+                  app.log.error(`RRule module structure not recognized for task ${record.task.id}`)
+                  continue
+                }
+                
                 if (!parsedRule || typeof parsedRule.origOptions === 'undefined') {
                   app.log.warn(`Invalid RRule string for task ${record.task.id}: ${ruleKey}`)
                   continue
@@ -96,7 +114,7 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
                 options.dtstart = record.task.scheduled_at || record.task.created_at
                 // Set timezone to user's timezone for accurate occurrence calculation
                 options.tzid = record.user.timezone || 'UTC'
-                const finalRule = new RRule(options)
+                const finalRule = new RRuleConstructor(options)
                 
                 ruleCache.set(ruleKey, {
                   rule: finalRule,

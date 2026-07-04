@@ -96,12 +96,33 @@ export async function getRRule() {
   if (RRulePromise) return RRulePromise
   
   RRulePromise = import('rrule').then(m => {
-    // Handle both default and named exports
-    const rruleModule = m.default || m.RRule || m
-    if (!rruleModule) {
-      throw new Error('RRule module not found in rrule package')
+    // Handle different RRule module structures
+    // Case 1: Default export is the RRule class
+    if (m.default && typeof m.default === 'function') {
+      return m.default
     }
-    return rruleModule
+    // Case 2: Named export RRule
+    if (m.RRule && typeof m.RRule === 'function') {
+      return m.RRule
+    }
+    // Case 3: The module itself is the RRule class
+    if (typeof m === 'function') {
+      return m
+    }
+    // Case 4: Check for fromString method
+    if (m.default && typeof m.default.fromString === 'function') {
+      return m.default
+    }
+    if (m.RRule && typeof m.RRule.fromString === 'function') {
+      return m.RRule
+    }
+    if (typeof m.fromString === 'function') {
+      return m
+    }
+    
+    // If none of the above, return the module as-is and let the caller handle it
+    console.warn('RRule module structure not recognized, returning raw module')
+    return m
   }).catch(err => {
     console.error('Failed to load RRule:', err)
     throw err
