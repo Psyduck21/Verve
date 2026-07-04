@@ -110,13 +110,13 @@ export async function getRRule() {
       return m
     }
     // Case 4: Check for fromString method
-    if (m.default && typeof m.default.fromString === 'function') {
+    if (m.default && typeof (m.default as any).fromString === 'function') {
       return m.default
     }
-    if (m.RRule && typeof m.RRule.fromString === 'function') {
+    if (m.RRule && typeof (m.RRule as any).fromString === 'function') {
       return m.RRule
     }
-    if (typeof m.fromString === 'function') {
+    if (typeof (m as any).fromString === 'function') {
       return m
     }
     

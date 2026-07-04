@@ -1,9 +1,10 @@
 import fp from 'fastify-plugin'
+import { FastifyInstance } from 'fastify'
 import { startRecurrenceWorker } from '../workers/recurrence.worker'
 import { notificationQueue } from '../lib/queue'
 import { setupQueueShutdown } from '../lib/queue'
 
-export const recurrenceWorkerPlugin = fp(async (app) => {
+export const recurrenceWorkerPlugin = fp(async (app: FastifyInstance) => {
   // Start the BullMQ worker
   const worker = startRecurrenceWorker(app)
 
@@ -19,7 +20,7 @@ export const recurrenceWorkerPlugin = fp(async (app) => {
       repeat: {
         pattern: '*/15 * * * *', // Every 15 minutes
       },
-      jobId: 'system-cron-check-recurrences', 
+      jobId: 'system-cron-check-recurrences',
     }
   )
 
