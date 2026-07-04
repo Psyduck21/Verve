@@ -114,7 +114,7 @@ export const RescheduleRequestSchema = z.object({
         title:                        z.string(),
         priority:                     TaskPrioritySchema,
         status:                       TaskStatusSchema,
-        scheduled_at:                 ISOString,
+        scheduled_at:                 ISOString.nullable().optional(),
         estimated_duration_minutes:   z.number().int().positive(),
         is_time_locked:               z.boolean(),
       })
@@ -198,7 +198,7 @@ export const OmniboxRequestSchema = z.object({
         title:                        z.string(),
         priority:                     TaskPrioritySchema,
         status:                       TaskStatusSchema,
-        scheduled_at:                 ISOString,
+        scheduled_at:                 ISOString.nullable().optional(),
         estimated_duration_minutes:   z.number().int().positive(),
         is_time_locked:               z.boolean(),
       })
