@@ -85,7 +85,7 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
               const ruleKey = record.recurrence.recurrence_rule
             
               // Use cached rule if available
-              let cachedRule = ruleCache.get(ruleKey)
+              const cachedRule = ruleCache.get(ruleKey)
               if (!cachedRule) {
                 const parsedRule = RRule.fromString(ruleKey)
                 if (!parsedRule || typeof parsedRule.origOptions === 'undefined') {
