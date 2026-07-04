@@ -121,28 +121,36 @@ export const tasksRoutes: FastifyPluginAsync = async (app) => {
     // 1. Parent tasks (no parent_task_id): recurring masters always, non-recurring only if in date range
     // 2. Child tasks (have parent_task_id): only if they fall within the date range
     // This is CRITICAL for the frontend's virtual projection skip logic to work correctly
+    const hasDateFilter = !!(start_date || end_date)
+
     const parentTaskConditions: any[] = [
       eq(tasks.user_id, user.id),
       isNull(tasks.parent_task_id),
       cursor ? lt(tasks.scheduled_at, new Date(cursor)) : undefined,
-      // Parent tasks: include if recurring (always) OR falls within date range
-      or(
-        isNotNull(taskRecurrences.id),
-        and(
-          start_date ? gte(tasks.scheduled_at, start_date) : undefined,
-          end_date ? lte(tasks.scheduled_at, end_date) : undefined
+    ]
+
+    if (hasDateFilter) {
+      parentTaskConditions.push(
+        or(
+          isNotNull(taskRecurrences.id),
+          and(
+            start_date ? gte(tasks.scheduled_at, start_date) : undefined,
+            end_date ? lte(tasks.scheduled_at, end_date) : undefined
+          )
         )
       )
-    ]
+    }
 
     const childTaskConditions: any[] = [
       eq(tasks.user_id, user.id),
       isNotNull(tasks.parent_task_id),
       cursor ? lt(tasks.scheduled_at, new Date(cursor)) : undefined,
-      // Child tasks: only include if they fall within the date range
-      start_date ? gte(tasks.scheduled_at, start_date) : undefined,
-      end_date ? lte(tasks.scheduled_at, end_date) : undefined
     ]
+
+    if (hasDateFilter) {
+      if (start_date) childTaskConditions.push(gte(tasks.scheduled_at, start_date))
+      if (end_date) childTaskConditions.push(lte(tasks.scheduled_at, end_date))
+    }
 
     // Query: fetch both parent and child tasks
     const results = await db
