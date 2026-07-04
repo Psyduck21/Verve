@@ -11,12 +11,13 @@ export const recurrenceWorkerPlugin = fp(async (app) => {
   setupQueueShutdown(app, [worker])
 
   // Register a repeatable BullMQ job to act as the cron for checking recurrences
+  // Run every 15 minutes to catch edge cases around time boundaries
   await notificationQueue.add(
     'check-recurrences',
     {},
     {
       repeat: {
-        pattern: '0 * * * *', // Every hour
+        pattern: '*/15 * * * *', // Every 15 minutes
       },
       jobId: 'system-cron-check-recurrences', 
     }

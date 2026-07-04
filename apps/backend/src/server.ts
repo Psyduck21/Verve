@@ -78,10 +78,19 @@ import { timeblocksRoutes } from './modules/timeblocks/timeblocks.routes'
 import { templatesRoutes } from './modules/templates/templates.routes'
 import { routinesRoutes } from './modules/routines/routines.routes'
 
-Sentry.init({
-  dsn: process.env.SENTRY_DSN || '',
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-})
+// Initialize Sentry if DSN is provided
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+    environment: process.env.NODE_ENV || 'development',
+  })
+  console.log('✅ Sentry error tracking enabled')
+} else {
+  console.log('ℹ️  Sentry DSN not configured - error tracking disabled')
+  console.log('   Add SENTRY_DSN environment variable to enable production error monitoring')
+  console.log('   Alternative: Use Render\'s built-in logging or Logtail for lightweight monitoring')
+}
 
 // The port must fallback to process.env.PORT for Render deployment compatibility
 const PORT = parseInt(process.env.PORT || process.env.API_PORT || '3001', 10)

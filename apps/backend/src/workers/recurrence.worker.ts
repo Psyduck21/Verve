@@ -18,7 +18,8 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
         
         let spawnedCount = 0
         const now = new Date()
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+        // Check for tasks in the next 2 hours (more precise with 15-minute intervals)
+        const lookAhead = new Date(now.getTime() + 2 * 60 * 60 * 1000)
         
         // Optimized: Fetch all recurrences with user timezone in single query
         const activeRecurrences = await db
@@ -51,7 +52,18 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
         
         // Optimized: Cache parsed RRules to avoid repeated parsing
         const ruleCache = new Map<string, any>()
-        const RRule = await getRRule()
+        let RRule
+        try {
+          RRule = await getRRule()
+        } catch (err) {
+          app.log.error({ err }, 'Failed to load RRule library')
+          return { success: false, error: 'RRule library not available' }
+        }
+        
+        if (!RRule || typeof RRule.fromString !== 'function') {
+          app.log.error('RRule library is not properly loaded')
+          return { success: false, error: 'RRule library not properly loaded' }
+        }
         
         for (const record of activeRecurrences) {
           try {
@@ -61,6 +73,10 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
             let rule = ruleCache.get(ruleKey)
             if (!rule) {
               rule = RRule.fromString(ruleKey)
+              if (!rule || typeof rule.origOptions === 'undefined') {
+                app.log.warn(`Invalid RRule string for task ${record.task.id}: ${ruleKey}`)
+                continue
+              }
               const options = rule.origOptions
               options.dtstart = record.task.scheduled_at || record.task.created_at
               // Set timezone to user's timezone for accurate occurrence calculation
@@ -71,8 +87,8 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
             
             const nextDate = rule.after(now)
 
-            // If the next occurrence is within the next 24 hours
-            if (nextDate && nextDate <= tomorrow) {
+            // If the next occurrence is within the look-ahead window
+            if (nextDate && nextDate <= lookAhead) {
               const spawnKey = `${record.task.id}-${nextDate.toISOString()}`
               
               // Check against set instead of querying database

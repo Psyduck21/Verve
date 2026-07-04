@@ -13,7 +13,10 @@ if (!REDIS_URL) {
 // Create a reusable Redis connection for BullMQ
 export const connection = REDIS_URL ? new Redis(REDIS_URL, {
   maxRetriesPerRequest: null,
-}) : new Redis({ maxRetriesPerRequest: null })
+  // Suppress BullMQ eviction policy warnings for Upstash Redis
+  // Upstash uses 'optimistic-volatile' which is acceptable for their managed service
+  enableReadyCheck: false,
+}) : new Redis({ maxRetriesPerRequest: null, enableReadyCheck: false })
 
 export const QUEUE_NAMES = {
   NOTIFICATIONS: 'notifications-queue',

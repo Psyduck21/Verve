@@ -38,5 +38,8 @@
   },
   "overrides": {
     "react-native-reanimated": "3.19.5"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
   }
 }

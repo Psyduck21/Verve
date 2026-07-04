@@ -12,7 +12,7 @@ export const metricsPlugin: FastifyPluginAsync = fp(async (app) => {
   // Add metrics hook to track all requests
   app.addHook('onResponse', async (request, reply) => {
     const { trackHttpRequest } = await import('../lib/metrics')
-    const duration = reply.getResponseTime()
+    const duration = reply.elapsedTime
     trackHttpRequest(
       request.method,
       request.routeOptions.url || request.routerPath,

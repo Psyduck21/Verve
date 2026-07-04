@@ -95,9 +95,25 @@ export async function getRRule() {
   
   if (RRulePromise) return RRulePromise
   
-  RRulePromise = import('rrule').then(m => m.RRule)
-  RRule = await RRulePromise
-  return RRule
+  RRulePromise = import('rrule').then(m => {
+    // Handle both default and named exports
+    const rruleModule = m.default || m.RRule || m
+    if (!rruleModule) {
+      throw new Error('RRule module not found in rrule package')
+    }
+    return rruleModule
+  }).catch(err => {
+    console.error('Failed to load RRule:', err)
+    throw err
+  })
+  
+  try {
+    RRule = await RRulePromise
+    return RRule
+  } catch (err) {
+    console.error('RRule loading failed:', err)
+    throw err
+  }
 }
 
 // Additional heavy dependencies can be added here as needed

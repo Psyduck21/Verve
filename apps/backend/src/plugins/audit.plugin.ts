@@ -30,7 +30,7 @@ export const auditPlugin = fp(async (app) => {
           method: request.method,
           url: request.url,
           statusCode: reply.statusCode,
-          responseTime: reply.getResponseTime(),
+          responseTime: reply.elapsedTime,
           // Careful not to log sensitive body data directly without masking
           // For now, we omit the body to be safe, or just log query params
           query: request.query
