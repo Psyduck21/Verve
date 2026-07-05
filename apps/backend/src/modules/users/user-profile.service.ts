@@ -30,7 +30,7 @@ export class UserProfileService {
       const cacheKey = `${this.CACHE_PREFIX}${userId}`
       const cached = await redis.get(cacheKey)
       if (cached) {
-        return JSON.parse(cached) as UserProfile
+        return JSON.parse(cached as string) as UserProfile
       }
 
       // Fetch from database
@@ -70,7 +70,8 @@ export class UserProfileService {
       }
 
       // Cache the result
-      await redis.set(cacheKey, JSON.stringify(profile), 'EX', this.CACHE_TTL)
+      await redis.set(cacheKey, JSON.stringify(profile))
+      await redis.expire(cacheKey, this.CACHE_TTL)
 
       return profile
     } catch (error) {

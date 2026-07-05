@@ -103,7 +103,7 @@ Answers: ${JSON.stringify(body.answers)}`
             if (!isValidTime) {
               logger.warn(`AI generated routine task outside awake hours: ${task.scheduled_at}`)
               // Remove the scheduled_at to make it unscheduled rather than invalid
-              task.scheduled_at = null
+              delete (task as any).scheduled_at
             }
           }
         }
@@ -203,7 +203,7 @@ Current Context: ${JSON.stringify(userTasks)}`
           if (!isValidTime) {
             logger.warn(`AI scheduled task outside awake hours: ${action.new_scheduled_at}`)
             // Remove the scheduled_at to make it unscheduled rather than invalid
-            action.new_scheduled_at = null
+            delete (action as any).new_scheduled_at
           }
         }
 
@@ -277,7 +277,7 @@ Current Context: ${JSON.stringify(body.context.tasks)}`
           if (!isValidTime) {
             logger.warn(`AI scheduled task outside awake hours: ${action.new_scheduled_at}`)
             // Remove the scheduled_at to make it unscheduled rather than invalid
-            action.new_scheduled_at = null
+            delete (action as any).new_scheduled_at
           }
         }
 
@@ -329,7 +329,7 @@ Raw Input: "${body.raw_input}"`
         if (!isValidTime) {
           logger.warn(`AI scheduled task outside awake hours: ${aiResponse.data.scheduled_at}`)
           // Remove the scheduled_at to make it unscheduled rather than invalid
-          aiResponse.data.scheduled_at = null
+          delete (aiResponse.data as any).scheduled_at
         }
       }
 
