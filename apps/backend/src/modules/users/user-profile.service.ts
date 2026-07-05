@@ -123,7 +123,24 @@ SCHEDULING CONSTRAINTS:
   /**
    * Validate if a scheduled time is within user's awake hours
    */
-  static async isValidScheduleTime(userId: string, scheduledAt: string): Promise<boolean> {
+  static isValidScheduleTime(userId: string, scheduledAt: string): boolean {
+    // For synchronous validation, we'll do a simple time check without fetching profile
+    // This is a fallback - the profile should be passed in for accurate validation
+    const scheduledDate = new Date(scheduledAt)
+    const scheduledMinutes = scheduledDate.getHours() * 60 + scheduledDate.getMinutes()
+
+    // Default awake hours: 9:00 to 22:00 (could be made configurable)
+    const defaultWakeMinutes = 9 * 60 // 9:00 AM
+    const defaultSleepMinutes = 22 * 60 // 10:00 PM
+
+    // Check if time is within default wake/sleep window
+    return scheduledMinutes >= defaultWakeMinutes && scheduledMinutes < defaultSleepMinutes
+  }
+
+  /**
+   * Validate if a scheduled time is within user's awake hours (async version with profile)
+   */
+  static async isValidScheduleTimeWithProfile(userId: string, scheduledAt: string): Promise<boolean> {
     const profile = await this.getUserProfile(userId)
     if (!profile) {
       return true // Default to valid if profile not found

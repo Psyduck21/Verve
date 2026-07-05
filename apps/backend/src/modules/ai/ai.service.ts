@@ -99,7 +99,7 @@ Answers: ${JSON.stringify(body.answers)}`
       if (aiResponse.data?.tasks && userProfile) {
         for (const task of aiResponse.data.tasks) {
           if (task.scheduled_at) {
-            const isValidTime = await UserProfileService.isValidScheduleTime(userId, task.scheduled_at)
+            const isValidTime = await UserProfileService.isValidScheduleTimeWithProfile(userId, task.scheduled_at)
             if (!isValidTime) {
               logger.warn(`AI generated routine task outside awake hours: ${task.scheduled_at}`)
               // Remove the scheduled_at to make it unscheduled rather than invalid
@@ -199,7 +199,7 @@ Current Context: ${JSON.stringify(userTasks)}`
 
         // Validate scheduled times are within user's awake hours
         if (action.new_scheduled_at && userProfile) {
-          const isValidTime = await UserProfileService.isValidScheduleTime(userId, action.new_scheduled_at)
+          const isValidTime = UserProfileService.isValidScheduleTimeWithProfile(userId, action.new_scheduled_at)
           if (!isValidTime) {
             logger.warn(`AI scheduled task outside awake hours: ${action.new_scheduled_at}`)
             // Remove the scheduled_at to make it unscheduled rather than invalid
@@ -273,7 +273,7 @@ Current Context: ${JSON.stringify(body.context.tasks)}`
 
         // Validate scheduled times are within user's awake hours
         if (action.new_scheduled_at && userProfile) {
-          const isValidTime = await UserProfileService.isValidScheduleTime(userId, action.new_scheduled_at)
+          const isValidTime = UserProfileService.isValidScheduleTimeWithProfile(userId, action.new_scheduled_at)
           if (!isValidTime) {
             logger.warn(`AI scheduled task outside awake hours: ${action.new_scheduled_at}`)
             // Remove the scheduled_at to make it unscheduled rather than invalid
@@ -325,7 +325,7 @@ Raw Input: "${body.raw_input}"`
 
       // Validate scheduled time is within user's awake hours
       if (aiResponse.data?.scheduled_at && userProfile) {
-        const isValidTime = await UserProfileService.isValidScheduleTime(userId, aiResponse.data.scheduled_at)
+        const isValidTime = await UserProfileService.isValidScheduleTimeWithProfile(userId, aiResponse.data.scheduled_at)
         if (!isValidTime) {
           logger.warn(`AI scheduled task outside awake hours: ${aiResponse.data.scheduled_at}`)
           // Remove the scheduled_at to make it unscheduled rather than invalid

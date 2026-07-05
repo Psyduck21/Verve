@@ -81,7 +81,7 @@ export class TasksService {
 
     // Validate scheduled time against user's awake hours
     if (taskData.scheduled_at) {
-      const isValidTime = await UserProfileService.isValidScheduleTime(userId, taskData.scheduled_at)
+      const isValidTime = await UserProfileService.isValidScheduleTimeWithProfile(userId, taskData.scheduled_at)
       if (!isValidTime) {
         logger.warn(`Task scheduled outside awake hours: ${taskData.scheduled_at}`)
         // Don't block creation, but warn and optionally make it unscheduled
