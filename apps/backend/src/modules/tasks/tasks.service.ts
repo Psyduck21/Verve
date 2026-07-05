@@ -8,6 +8,8 @@ import { realtimeService } from '../../lib/realtime'
 import { notificationQueue } from '../../lib/queue'
 import { validateRecurrenceRule, standardizeRecurrenceRule } from '../../lib/recurrenceValidation'
 import { RECURRENCE_CONSTANTS } from '../../lib/constants'
+import { UserProfileService } from '../users'
+import { logger } from '../../lib/logger'
 
 export const CreateSubtaskSchema = z.object({
   title: z.string().min(1).max(200),
@@ -76,10 +78,21 @@ export class TasksService {
 
   static async createTask(userId: string, taskData: any) {
     let routineId = taskData.routine_id
-    
+
+    // Validate scheduled time against user's awake hours
+    if (taskData.scheduled_at) {
+      const isValidTime = await UserProfileService.isValidScheduleTime(userId, taskData.scheduled_at)
+      if (!isValidTime) {
+        logger.warn(`Task scheduled outside awake hours: ${taskData.scheduled_at}`)
+        // Don't block creation, but warn and optionally make it unscheduled
+        // For now, we'll allow it but log the warning
+        // Alternatively: taskData.scheduled_at = null
+      }
+    }
+
     // Optimized: Batch fetch validation data in parallel
     const [routine, parentTask] = await Promise.all([
-      taskData.routine_id 
+      taskData.routine_id
         ? db.select({ id: routines.id }).from(routines)
             .where(and(eq(routines.id, taskData.routine_id), eq(routines.user_id, userId)))
             .limit(1)

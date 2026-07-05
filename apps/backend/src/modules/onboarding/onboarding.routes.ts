@@ -4,6 +4,7 @@ import { db } from '../../lib/db'
 import { users, onboardingAnalytics, routines, tasks } from '@verve/db'
 import { and, eq, sql } from '@verve/db'
 import { OnboardingService } from './onboarding.service'
+import { UserProfileService } from '../users'
 import { logger } from '../../lib/logger'
 
 function deriveFullName(email?: string, userMetadata?: Record<string, any>) {
@@ -172,6 +173,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
       .where(eq(users.id, user.id))
       .returning()
 
+    // Invalidate user profile cache when onboarding data is updated
+    await UserProfileService.invalidateCache(user.id)
+
     return reply.send({ success: true, data: updated[0] })
   })
 
@@ -324,6 +328,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
         .returning()
     })
 
+    // Invalidate user profile cache when onboarding is completed
+    await UserProfileService.invalidateCache(user.id)
+
     return reply.send({ success: true, data: updated[0] })
   })
 
@@ -370,6 +377,9 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
       })
       .where(eq(users.id, user.id))
       .returning()
+
+    // Invalidate user profile cache when onboarding is skipped
+    await UserProfileService.invalidateCache(user.id)
 
     return reply.send({ success: true, data: updated[0] })
   })

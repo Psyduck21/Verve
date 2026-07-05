@@ -14,6 +14,7 @@ import {
   OmniboxRequest
 } from '@verve/shared'
 import { MemoryService } from './memory.service'
+import { UserProfileService } from '../users'
 import { logger } from '../../lib/logger'
 
 export class AiService {
@@ -73,12 +74,18 @@ export class AiService {
   static async generateRoutine(userId: string, body: GenerateRoutineRequest) {
     await this.checkBudgetAndIncrement(userId)
 
+    // Fetch user profile for scheduling constraints
+    const userProfile = await UserProfileService.getUserProfile(userId)
+    const userContext = userProfile ? await UserProfileService.getAIContext(userId) : ''
+
     const relevantMemories = await MemoryService.getRelevantMemories(userId, JSON.stringify(body.answers))
     const memoryContext = relevantMemories.length > 0 ? `Past Habits & Memories:\n- ${relevantMemories.join('\n- ')}` : ''
 
     // const systemPrompt = `You are a productivity AI. Generate a customized daily routine based on the user profile. Return JSON strictly matching: { "routine": { "title": "string", "goal": "string" }, "tasks": [ { "title": "string", "priority": "critical|high|medium|low", "scheduled_at": "ISOString", "estimated_duration_minutes": number, "category": "string" } ] }\n\n${memoryContext}`
     const systemPromptWithDescription = `You MUST include a short, human-friendly 'description' for each task that summarizes intent and context. Use the user's profile details (full_name, grind_type, wake_time, daily_commitment_minutes) and the task title to craft a meaningful description. Do NOT default category to 'personal' — infer a category for each task such as 'work', 'personal', 'health', 'learning', etc. Return JSON strictly matching: { "routine": { "title": "string", "goal": "string" }, "tasks": [ { "title": "string", "priority": "critical|high|medium|low", "scheduled_at": "ISOString", "estimated_duration_minutes": number, "category": "string", "description": "string" } ] }\n\n${memoryContext}`
-    const userPrompt = `Profile: ${JSON.stringify(body.profile)}\nAnswers: ${JSON.stringify(body.answers)}`
+    const userPrompt = `${userContext}
+Profile: ${JSON.stringify(body.profile)}
+Answers: ${JSON.stringify(body.answers)}`
 
     const start = Date.now()
     try {
@@ -87,6 +94,21 @@ export class AiService {
         userPrompt,
         schema: GeneratedRoutineSchema,
       })
+
+      // Validate scheduled times are within user's awake hours
+      if (aiResponse.data?.tasks && userProfile) {
+        for (const task of aiResponse.data.tasks) {
+          if (task.scheduled_at) {
+            const isValidTime = await UserProfileService.isValidScheduleTime(userId, task.scheduled_at)
+            if (!isValidTime) {
+              logger.warn(`AI generated routine task outside awake hours: ${task.scheduled_at}`)
+              // Remove the scheduled_at to make it unscheduled rather than invalid
+              task.scheduled_at = null
+            }
+          }
+        }
+      }
+
       await this.logUsage(userId, 'generate_routine', aiResponse, Date.now() - start)
       return aiResponse.data
     } catch (e: any) {
@@ -128,6 +150,10 @@ STRICT RULES:
   static async reschedule(userId: string, body: RescheduleRequest) {
     await this.checkBudgetAndIncrement(userId)
 
+    // Fetch user profile for scheduling constraints
+    const userProfile = await UserProfileService.getUserProfile(userId)
+    const userContext = userProfile ? await UserProfileService.getAIContext(userId) : ''
+
     const userTasks = await db.select({
       id: tasks.id,
       title: tasks.title,
@@ -137,7 +163,10 @@ STRICT RULES:
     }).from(tasks).where(and(eq(tasks.user_id, userId), eq(tasks.status, 'not_started')))
 
     const systemPrompt = `You are an intent parser. Map the user's natural language command to specific calendar actions based on their current tasks. STRICT RULES: Any task with is_time_locked=true is an external calendar event (e.g. from Google Calendar) and CANNOT be moved, canceled, or updated under any circumstances. Do not output CANCEL actions unless the user explicitly asks to remove or delete a specific task. For commands like "clear my afternoon" or "push tasks to tomorrow", always reschedule tasks using MOVE or UPDATE instead of canceling them. When rescheduling, prioritize finding a new time within the upcoming week. ONLY omit 'new_scheduled_at' (falling back to unscheduled) if it is completely impossible to schedule the task within the next 7 days based on the user's constraints. If you produce any CREATE actions, include both "description" and "category" on every CREATE action, and make them non-empty strings. Use only one of the categories: 'work', 'personal', or 'health'. Output JSON matching an array of actions: { "action": "MOVE"|"UPDATE"|"CREATE", "task_id": "uuid(optional)", "new_scheduled_at": "ISOString", "new_title": "string", "description": "string", "category": "string" }`
-    const userPrompt = `Command: "${body.command}"\nCurrent Context: ${JSON.stringify(userTasks)}`
+
+    const userPrompt = `${userContext}
+Command: "${body.command}"
+Current Context: ${JSON.stringify(userTasks)}`
 
     const start = Date.now()
     try {
@@ -153,7 +182,7 @@ STRICT RULES:
 
       const validTaskIds = new Set(userTasks.map(t => t.id))
       const timeLockedTaskIds = new Set(userTasks.filter(t => t.is_time_locked).map(t => t.id))
-      
+
       const filteredActions = aiResponse.data.filter((action: any) => {
         if (action.action === 'CANCEL') {
           throw new Error('AI generated a CANCEL action. Use MOVE/UPDATE to reschedule tasks instead of cancellation.')
@@ -167,6 +196,17 @@ STRICT RULES:
             return false
           }
         }
+
+        // Validate scheduled times are within user's awake hours
+        if (action.new_scheduled_at && userProfile) {
+          const isValidTime = await UserProfileService.isValidScheduleTime(userId, action.new_scheduled_at)
+          if (!isValidTime) {
+            logger.warn(`AI scheduled task outside awake hours: ${action.new_scheduled_at}`)
+            // Remove the scheduled_at to make it unscheduled rather than invalid
+            action.new_scheduled_at = null
+          }
+        }
+
         return true
       })
 
@@ -183,6 +223,10 @@ STRICT RULES:
   static async processOmnibox(userId: string, body: OmniboxRequest) {
     await this.checkBudgetAndIncrement(userId)
 
+    // Fetch user profile for scheduling constraints
+    const userProfile = await UserProfileService.getUserProfile(userId)
+    const userContext = userProfile ? await UserProfileService.getAIContext(userId) : ''
+
     const systemPrompt = `You are a universal AI Omnibox for a calendar app. Map the user's natural language command to an array of specific actions: { "action": "MOVE"|"UPDATE"|"CREATE", "task_id": "uuid(optional)", "new_scheduled_at": "ISOString", "new_duration_minutes": number, "new_title": "string", "new_priority": "critical|high|medium|low", "description": "string", "category": "string" }
 
 STRICT RULES:
@@ -192,7 +236,8 @@ STRICT RULES:
 4. For commands like "clear my afternoon", reschedule tasks to another time or day instead of canceling them.
 5. Output MUST be an array of actions matching the schema.`
 
-    const userPrompt = `Current Local Time: ${body.local_time_string}
+    const userPrompt = `${userContext}
+Current Local Time: ${body.local_time_string}
 User Timezone: ${body.timezone}
 Command: "${body.command}"
 Current Context: ${JSON.stringify(body.context.tasks)}`
@@ -211,7 +256,7 @@ Current Context: ${JSON.stringify(body.context.tasks)}`
 
       const validTaskIds = new Set(body.context.tasks.map(t => t.id))
       const timeLockedTaskIds = new Set(body.context.tasks.filter(t => t.is_time_locked).map(t => t.id))
-      
+
       const filteredActions = aiResponse.data.filter((action: any) => {
         if (action.action === 'CANCEL') {
           throw new Error('AI generated a CANCEL action. Use MOVE/UPDATE to reschedule tasks instead of cancellation.')
@@ -225,6 +270,17 @@ Current Context: ${JSON.stringify(body.context.tasks)}`
             return false
           }
         }
+
+        // Validate scheduled times are within user's awake hours
+        if (action.new_scheduled_at && userProfile) {
+          const isValidTime = await UserProfileService.isValidScheduleTime(userId, action.new_scheduled_at)
+          if (!isValidTime) {
+            logger.warn(`AI scheduled task outside awake hours: ${action.new_scheduled_at}`)
+            // Remove the scheduled_at to make it unscheduled rather than invalid
+            action.new_scheduled_at = null
+          }
+        }
+
         return true
       })
 
@@ -241,6 +297,10 @@ Current Context: ${JSON.stringify(body.context.tasks)}`
   static async parseTask(userId: string, body: ParseTaskRequest) {
     await this.checkBudgetAndIncrement(userId)
 
+    // Fetch user profile for scheduling constraints
+    const userProfile = await UserProfileService.getUserProfile(userId)
+    const userContext = userProfile ? await UserProfileService.getAIContext(userId) : ''
+
     const systemPrompt = `You are a productivity AI that extracts actionable tasks from natural language input.
 STRICT RULES:
 1. Return JSON strictly matching the provided schema.
@@ -250,7 +310,10 @@ STRICT RULES:
 5. Return the title as a clean, human-friendly task name. Preserve capitalization where appropriate and do not lowercase the title unless required for proper grammar.
 6. AUTOMATIC PRIORITIZATION & CATEGORIZATION: You MUST infer the 'priority' (critical, high, medium, low) and 'category' from one of: 'work', 'personal', or 'health' based purely on the semantic meaning of the task description and title (e.g. "production outage" -> critical/work, "buy milk" -> low/personal).`
 
-    const userPrompt = `Current User Local Time: ${body.local_time_string}\nUser Timezone: ${body.timezone}\nRaw Input: "${body.raw_input}"`
+    const userPrompt = `${userContext}
+Current User Local Time: ${body.local_time_string}
+User Timezone: ${body.timezone}
+Raw Input: "${body.raw_input}"`
 
     const start = Date.now()
     try {
@@ -259,6 +322,17 @@ STRICT RULES:
         userPrompt,
         schema: ParseTaskSchema,
       })
+
+      // Validate scheduled time is within user's awake hours
+      if (aiResponse.data?.scheduled_at && userProfile) {
+        const isValidTime = await UserProfileService.isValidScheduleTime(userId, aiResponse.data.scheduled_at)
+        if (!isValidTime) {
+          logger.warn(`AI scheduled task outside awake hours: ${aiResponse.data.scheduled_at}`)
+          // Remove the scheduled_at to make it unscheduled rather than invalid
+          aiResponse.data.scheduled_at = null
+        }
+      }
+
       await this.logUsage(userId, 'parse_task', aiResponse, Date.now() - start)
       return aiResponse.data
     } catch (e: any) {

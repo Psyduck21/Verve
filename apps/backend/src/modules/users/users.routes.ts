@@ -5,6 +5,7 @@ import { db } from '../../lib/db'
 import { users, tasks, routines, tombstones } from '@verve/db'
 import { eq } from '@verve/db'
 import { supabase } from '../../lib/supabase'
+import { UserProfileService } from './user-profile.service'
 
 function deriveFullName(email: string, userMetadata: any) {
   return userMetadata?.full_name
@@ -126,7 +127,7 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
   app.put('/preferences', { preHandler: [app.authenticate, app.validateCSRF] }, async (req, reply) => {
     const user = req.user!
     const parsed = UpdatePreferencesSchema.safeParse(req.body)
-    
+
     if (!parsed.success) {
       return reply.status(400).send({ success: false, error: parsed.error.issues })
     }
@@ -135,6 +136,9 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
       .set(parsed.data)
       .where(eq(users.id, user.id))
       .returning()
+
+    // Invalidate user profile cache when preferences are updated
+    await UserProfileService.invalidateCache(user.id)
 
     return reply.send({ success: true, data: updated[0] })
   })
