@@ -66,7 +66,7 @@ export class AIRateLimiter {
     `
 
     // Check minute limit
-    const minuteCount = await redis.eval(rateLimitScript, [minuteKey], [60]) as number
+    const minuteCount = await redis.eval(rateLimitScript, 1, minuteKey, 60) as number
     
     if (minuteCount > limits.perMinute) {
       const ttl = await redis.ttl(minuteKey)
@@ -74,7 +74,7 @@ export class AIRateLimiter {
     }
     
     // Check hour limit
-    const hourCount = await redis.eval(rateLimitScript, [hourKey], [3600]) as number
+    const hourCount = await redis.eval(rateLimitScript, 1, hourKey, 3600) as number
     
     if (hourCount > limits.perHour) {
       const ttl = await redis.ttl(hourKey)

@@ -1,5 +1,5 @@
 import Redis from 'ioredis'
-import { FastifyLogger } from 'fastify'
+import { FastifyBaseLogger } from 'fastify'
 
 // Circuit breaker states
 type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN'
@@ -43,7 +43,7 @@ class RedisFallbackClient {
   private fallback: RedisInstance
   private current: RedisInstance
   private config: FallbackConfig
-  private logger: FastifyLogger
+  private logger: FastifyBaseLogger
   private healthCheckTimer?: NodeJS.Timeout
   private stats: RedisStats = {
     primaryRequests: 0,
@@ -52,7 +52,7 @@ class RedisFallbackClient {
     circuitBreakerTrips: 0,
   }
 
-  constructor(config: FallbackConfig, logger: FastifyLogger) {
+  constructor(config: FallbackConfig, logger: FastifyBaseLogger) {
     this.config = config
     this.logger = logger
 

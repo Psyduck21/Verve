@@ -112,7 +112,7 @@ export class CacheService {
 
     // Set Redis cache (L2)
     try {
-      await redis.set(key, JSON.stringify(value), { ex: ttl })
+      await redis.set(key, JSON.stringify(value), 'EX', ttl)
 
       // Update tag index for selective invalidation
       for (const tag of tags) {

@@ -20,7 +20,7 @@ let redisFallbackClient: RedisFallbackClient | null = null
 if (FALLBACK_ENABLED && FALLBACK_REDIS_URL) {
   // Fallback will be initialized when the app starts with a logger instance
   // For now, create a placeholder that will be replaced
-  connection = new Redis(REDIS_URL, {
+  connection = new Redis(REDIS_URL || '', {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
     enableOfflineQueue: false,
@@ -63,11 +63,11 @@ export function initializeRedisFallback(logger: FastifyInstance): void {
         circuitBreakerTimeout: parseInt(process.env.REDIS_CIRCUIT_BREAKER_TIMEOUT || '60000'),
         autoFailover: process.env.REDIS_AUTO_FAILOVER !== 'false',
       }
-      redisFallbackClient = new RedisFallbackClient(config, logger)
+      redisFallbackClient = new RedisFallbackClient(config, logger.log)
       connection = redisFallbackClient
-      logger.info('Redis fallback client initialized')
+      logger.log.info('Redis fallback client initialized')
     } catch (error) {
-      logger.error({ error }, 'Failed to initialize Redis fallback client, using direct connection')
+      logger.log.error({ error }, 'Failed to initialize Redis fallback client, using direct connection')
     }
   }
 }

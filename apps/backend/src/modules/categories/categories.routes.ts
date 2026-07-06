@@ -26,7 +26,7 @@ export const categoriesRoutes: FastifyPluginAsync = async (app) => {
       const cached = await redis.get(cacheKey)
       if (cached) {
         reply.header('Cache-Control', 'private, max-age=300')
-        return reply.send({ success: true, data: cached })
+        return reply.send({ success: true, data: JSON.parse(cached) })
       }
     } catch (e) {
       app.log.warn({ err: e }, 'Redis cache read failed for categories')
@@ -35,7 +35,7 @@ export const categoriesRoutes: FastifyPluginAsync = async (app) => {
     const items = await CategoriesService.getCategories(user.id, limitNum, offsetNum)
     
     try {
-      await redis.set(cacheKey, items, { ex: 300 })
+      await redis.set(cacheKey, JSON.stringify(items), 'EX', 300)
     } catch (e) {
       app.log.warn({ err: e }, 'Redis cache write failed for categories')
     }

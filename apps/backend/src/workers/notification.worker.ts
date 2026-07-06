@@ -90,10 +90,6 @@ export function startNotificationWorker(app: FastifyInstance): Worker {
       concurrency: WORKER_CONSTANTS.NOTIFICATION_WORKER_CONCURRENCY,
       removeOnComplete: { count: WORKER_CONSTANTS.JOB_CLEANUP_COMPLETE_COUNT },
       removeOnFail: { count: WORKER_CONSTANTS.JOB_CLEANUP_FAILED_COUNT },
-      // Add settings to reduce Redis operations
-      settings: {
-        stalledInterval: 30000, // Check for stalled jobs less frequently (default 5000)
-      },
     }
   )
 
