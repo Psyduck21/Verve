@@ -66,8 +66,8 @@ export function InboxContent({ user }: { user?: any }) {
     }
 
     return (
-        <div className="flex flex-col h-full w-full bg-transparent">
-            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col overflow-hidden">
+        <div className="flex flex-col min-h-full w-full bg-transparent">
+            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col">
                 <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-thin">
                     <div className="flex items-center justify-between">
                         <h1 className="text-2xl font-bold text-foreground">Inbox</h1>

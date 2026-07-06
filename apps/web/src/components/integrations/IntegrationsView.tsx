@@ -89,8 +89,8 @@ export default function IntegrationsView() {
     }
 
     return (
-        <div className="flex flex-col h-full w-full bg-transparent" data-purpose="integrations-page">
-            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col overflow-hidden">
+        <div className="flex flex-col min-h-full w-full bg-transparent" data-purpose="integrations-page">
+            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col">
                 <div className="flex-1 overflow-y-auto p-8 scrollbar-thin">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {INTEGRATIONS.map((integration, i) => {

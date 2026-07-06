@@ -296,7 +296,7 @@ export function DashboardContent({ user }: { user?: any }) {
     }
 
     return (
-        <div className="flex flex-col h-full w-full bg-gradient-to-br from-background via-background to-muted/30" data-purpose="dashboard-page">
+        <div className="flex flex-col min-h-full w-full bg-gradient-to-br from-background via-background to-muted/30" data-purpose="dashboard-page">
             {/* Ambient background effects */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
@@ -304,9 +304,8 @@ export function DashboardContent({ user }: { user?: any }) {
                 <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-cyan-500/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
             </div>
 
-            <div className="flex flex-1 overflow-hidden relative z-10">
-                <div className="flex-1 overflow-y-auto">
-                    <div className="max-w-[1600px] mx-auto p-6 lg:p-8">
+            <div className="relative z-10">
+                <div className="max-w-[1600px] mx-auto p-6 lg:p-8">
                         
                         {/* Header Section */}
                         <motion.div 
@@ -610,7 +609,6 @@ export function DashboardContent({ user }: { user?: any }) {
                         </motion.div>
                     </div>
                 </div>
-            </div>
 
             <EditTaskModal
                 open={!!editTask}

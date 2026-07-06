@@ -35,7 +35,7 @@ export function AppShell({ children, user }: AppShellProps) {
     const avatarUrl = user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=2563eb&color=fff`
 
     return (
-        <div className="flex h-screen w-full overflow-hidden bg-background font-sans">
+        <div className="flex h-screen w-full bg-background font-sans">
             <Sidebar
                 userEmail={email}
                 userName={name}
@@ -43,13 +43,15 @@ export function AppShell({ children, user }: AppShellProps) {
                 onAIToggle={() => openModal("ai")}
             />
             
-            <main className="flex-1 min-w-0 h-full flex flex-col relative z-0 overflow-hidden">
+            <main className="flex-1 min-w-0 h-full flex flex-col relative z-0">
                 <TopHeader 
                     title="Verve"
                     onNewTask={() => openModal("task")}
                     onOpenAssistant={() => openModal("ai")}
                 />
-                {children}
+                <div className="flex-1 overflow-y-auto">
+                    {children}
+                </div>
             </main>
 
             <UniversalModal

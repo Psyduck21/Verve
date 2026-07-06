@@ -57,8 +57,8 @@ export default function TasksView() {
     })
 
     return (
-        <div className="flex flex-col h-full w-full bg-transparent" data-purpose="tasks-page">
-            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col overflow-hidden">
+        <div className="flex flex-col min-h-full w-full bg-transparent" data-purpose="tasks-page">
+            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col">
                 <div className="flex-1 overflow-y-auto p-8 flex flex-col">
                     <TasksActionBar 
                         view={view} 

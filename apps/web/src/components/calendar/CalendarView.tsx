@@ -473,7 +473,7 @@ export default function CalendarView({ selectedDate: selectedDateProp, onSelecte
     const timeblockDate = selectedDate ?? date
 
     return (
-        <div className="flex flex-col h-full w-full animate-fade-in-up gap-2">
+        <div className="flex flex-col min-h-full w-full animate-fade-in-up gap-2">
             {/* Custom Top Toolbar */}
             <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-6">

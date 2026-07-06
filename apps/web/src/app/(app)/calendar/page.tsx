@@ -12,8 +12,8 @@ const CalendarView = dynamic(() => import("@/components/calendar/CalendarView"),
 
 export default function CalendarPage() {
     return (
-        <div className="flex flex-col h-full w-full bg-transparent" data-purpose="calendar-page">
-            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col overflow-hidden">
+        <div className="flex flex-col min-h-full w-full bg-transparent" data-purpose="calendar-page">
+            <div className="flex-1 bg-card rounded-tl-[32px] border-t border-border flex flex-col">
                 <div className="flex-1 p-8 overflow-hidden flex flex-col">
                     <CalendarView />
                 </div>
