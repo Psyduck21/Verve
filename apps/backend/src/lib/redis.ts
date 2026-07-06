@@ -1,15 +1,19 @@
-import { Redis } from '@upstash/redis'
+import Redis from 'ioredis'
 
-const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL
-const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
+// Support both Valkey and Upstash Redis URLs
+const REDIS_URL = process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL
 
-if (!UPSTASH_URL || !UPSTASH_TOKEN) {
-  throw new Error('Missing Upstash Redis env vars. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in apps/backend/.env.local')
+if (!REDIS_URL) {
+  throw new Error('Missing Redis URL. Set REDIS_URL or UPSTASH_REDIS_URL in apps/backend/.env.local')
 }
 
-export const redis = new Redis({
-  url: UPSTASH_URL,
-  token: UPSTASH_TOKEN,
+export const redis = new Redis(REDIS_URL, {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+  connectTimeout: 10000,
+  commandTimeout: 5000,
 })
 
 // ── Key builders (centralized to avoid typos) ─────────────────

@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq'
 import { connection, QUEUE_NAMES } from '../lib/queue'
 import { AiService } from '../modules/ai/ai.service'
 import { FastifyInstance } from 'fastify'
+import { WORKER_CONSTANTS } from '../lib/constants'
 
 export function startAIWorker(app: FastifyInstance): Worker {
   app.log.info('Starting AI Worker...')
@@ -43,9 +44,13 @@ export function startAIWorker(app: FastifyInstance): Worker {
     },
     {
       connection: connection as any,
-      concurrency: 2, // Limit concurrent AI operations to prevent CPU exhaustion
-      removeOnComplete: { count: 50 },
-      removeOnFail: { count: 100 },
+      concurrency: WORKER_CONSTANTS.AI_WORKER_CONCURRENCY,
+      removeOnComplete: { count: WORKER_CONSTANTS.JOB_CLEANUP_COMPLETE_COUNT },
+      removeOnFail: { count: WORKER_CONSTANTS.JOB_CLEANUP_FAILED_COUNT },
+      // Add settings to reduce Redis operations
+      settings: {
+        stalledInterval: 30000, // Check for stalled jobs less frequently (default 5000)
+      },
     }
   )
 

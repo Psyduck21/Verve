@@ -30,7 +30,7 @@ export const notificationWorkerPlugin = fp(async (app) => {
     {},
     {
       repeat: {
-        pattern: '* * * * *', // Every minute
+        pattern: '*/5 * * * *', // Every 5 minutes (reduced from every minute to lower Redis usage)
       },
       jobId: 'system-cron-check-due-notifications', // Static ID ensures only one repeatable job exists
     }

@@ -10,8 +10,7 @@ const requiredEnvVars = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_JWT_SECRET',
   'OPENROUTER_API_KEY',
-  'UPSTASH_REDIS_REST_URL',
-  'UPSTASH_REDIS_REST_TOKEN',
+  'REDIS_URL', // Changed from UPSTASH_REDIS_REST_URL to support Valkey
   // 'POWERSYNC_PRIVATE_KEY',
 ]
 
@@ -59,6 +58,8 @@ import { aiWorkerPlugin } from './plugins/ai-worker.plugin'
 import { metricsPlugin } from './plugins/metrics.plugin'
 import { db } from './lib/db'
 import { redis } from './lib/redis'
+import { initializeRedisFallback } from './lib/queue'
+import { getRedisFallbackClient } from './lib/queue'
 import { sql } from '@verve/db'
 // import { authRoutes }        from './modules/auth/auth.routes'
 import { syncRoutes } from './modules/sync/sync.routes'
@@ -135,6 +136,10 @@ async function bootstrap() {
   await app.register(rateLimitPlugin)
   await app.register(authPlugin)
   await app.register(auditPlugin)
+  
+  // Initialize Redis fallback client before worker plugins
+  initializeRedisFallback(app)
+  
   await app.register(notificationWorkerPlugin)
   await app.register(recurrenceWorkerPlugin)
   await app.register(aiWorkerPlugin)
@@ -177,6 +182,127 @@ async function bootstrap() {
     environment: process.env.NODE_ENV ?? 'development',
   }))
 
+  // ── Redis fallback status endpoint (no auth) ─────────────────
+  app.get('/health/redis-fallback', { logLevel: 'warn' }, async () => {
+    const fallbackClient = getRedisFallbackClient()
+    
+    if (!fallbackClient) {
+      return {
+        enabled: false,
+        message: 'Redis fallback not configured'
+      }
+    }
+
+    const currentInstance = fallbackClient.getCurrentInstance()
+    const stats = fallbackClient.getStats()
+
+    return {
+      enabled: true,
+      currentInstance: {
+        name: currentInstance.name,
+        isPrimary: currentInstance.isPrimary,
+        healthy: currentInstance.healthy,
+        circuitState: currentInstance.circuitState,
+        failureCount: currentInstance.failureCount,
+        lastHealthCheck: currentInstance.lastHealthCheck,
+      },
+      stats: {
+        primaryRequests: stats.primaryRequests,
+        fallbackRequests: stats.fallbackRequests,
+        failoverCount: stats.failoverCount,
+        lastFailoverTime: stats.lastFailoverTime,
+        circuitBreakerTrips: stats.circuitBreakerTrips,
+      },
+      config: {
+        autoFailover: process.env.REDIS_AUTO_FAILOVER === 'true',
+        healthCheckInterval: process.env.REDIS_HEALTH_CHECK_INTERVAL,
+        circuitBreakerThreshold: process.env.REDIS_CIRCUIT_BREAKER_THRESHOLD,
+      }
+    }
+  })
+
+  // ── Manual Redis failover control (admin only) ───────────────
+  app.post('/admin/redis-fallback/failover', { logLevel: 'warn' }, async (request, reply) => {
+    const fallbackClient = getRedisFallbackClient()
+    
+    if (!fallbackClient) {
+      return reply.status(400).send({
+        success: false,
+        message: 'Redis fallback not configured'
+      })
+    }
+
+    try {
+      await fallbackClient.manualFailover()
+      app.log.warn('Manual Redis failover triggered via admin API')
+      return reply.send({
+        success: true,
+        message: 'Manual failover triggered successfully'
+      })
+    } catch (error) {
+      app.log.error({ error }, 'Manual failover failed')
+      return reply.status(500).send({
+        success: false,
+        message: 'Manual failover failed',
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+  })
+
+  app.post('/admin/redis-fallback/force-primary', { logLevel: 'warn' }, async (request, reply) => {
+    const fallbackClient = getRedisFallbackClient()
+    
+    if (!fallbackClient) {
+      return reply.status(400).send({
+        success: false,
+        message: 'Redis fallback not configured'
+      })
+    }
+
+    try {
+      fallbackClient.forcePrimary()
+      app.log.info('Forced switch to primary Redis via admin API')
+      return reply.send({
+        success: true,
+        message: 'Forced switch to primary Redis successfully'
+      })
+    } catch (error) {
+      app.log.error({ error }, 'Force primary failed')
+      return reply.status(500).send({
+        success: false,
+        message: 'Force primary failed',
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+  })
+
+  app.post('/admin/redis-fallback/force-fallback', { logLevel: 'warn' }, async (request, reply) => {
+    const fallbackClient = getRedisFallbackClient()
+    
+    if (!fallbackClient) {
+      return reply.status(400).send({
+        success: false,
+        message: 'Redis fallback not configured'
+      })
+    }
+
+    try {
+      fallbackClient.forceFallback()
+      app.log.info('Forced switch to fallback Redis via admin API')
+      return reply.send({
+        success: true,
+        message: 'Forced switch to fallback Redis successfully'
+      })
+    } catch (error) {
+      app.log.error({ error }, 'Force fallback failed')
+      return reply.status(500).send({
+        success: false,
+        message: 'Force fallback failed',
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+  })
+
     // ── CSRF token endpoint (no auth) ─────────────────────────
     // Provides a one-time CSRF token for clients to include in mutation requests
     app.get('/v1/csrf-token', async (request, reply) => {
@@ -214,7 +340,9 @@ async function bootstrap() {
     // Check Redis
     try {
       const start = Date.now()
-      await redis.ping()
+      // Use the Redis connection directly
+      const redisConnection = redis
+      await redisConnection.ping()
       health.dependencies.redis.latency = Date.now() - start
     } catch (error) {
       health.dependencies.redis.status = 'down'
@@ -286,13 +414,13 @@ async function bootstrap() {
     await app.listen({ port: PORT, host: '0.0.0.0' })
     app.log.info(`🚀 Verve backend running on port ${PORT}`)
 
-    // Verify Redis connectivity on boot so we know Upstash is actually reachable.
+    // Verify Redis connectivity on boot
     try {
       const start = Date.now()
       await redis.ping()
-      app.log.info({ latencyMs: Date.now() - start }, '✅ Upstash Redis connected')
+      app.log.info({ latencyMs: Date.now() - start }, '✅ Redis connected')
     } catch (error) {
-      app.log.warn({ err: error }, '⚠️ Upstash Redis ping failed')
+      app.log.warn({ err: error }, '⚠️ Redis ping failed')
     }
   } catch (err) {
     app.log.error(err)

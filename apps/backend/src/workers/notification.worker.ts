@@ -5,6 +5,7 @@ import { notificationSchedules, webPushSubscriptions } from '@verve/db'
 import { eq, isNull, and, lte } from '@verve/db'
 import { FastifyInstance } from 'fastify'
 import webpush from 'web-push'
+import { WORKER_CONSTANTS } from '../lib/constants'
 
 export function startNotificationWorker(app: FastifyInstance): Worker {
   app.log.info('Starting Notification Worker...')
@@ -86,9 +87,13 @@ export function startNotificationWorker(app: FastifyInstance): Worker {
     },
     {
       connection: connection as any,
-      concurrency: 5, 
-      removeOnComplete: { count: 100 },
-      removeOnFail: { count: 500 },
+      concurrency: WORKER_CONSTANTS.NOTIFICATION_WORKER_CONCURRENCY,
+      removeOnComplete: { count: WORKER_CONSTANTS.JOB_CLEANUP_COMPLETE_COUNT },
+      removeOnFail: { count: WORKER_CONSTANTS.JOB_CLEANUP_FAILED_COUNT },
+      // Add settings to reduce Redis operations
+      settings: {
+        stalledInterval: 30000, // Check for stalled jobs less frequently (default 5000)
+      },
     }
   )
 
