@@ -25,8 +25,10 @@ if (FALLBACK_ENABLED && FALLBACK_REDIS_URL) {
     enableReadyCheck: false,
     enableOfflineQueue: false,
     lazyConnect: true,
-    connectTimeout: 10000,
-    commandTimeout: 5000,
+    connectTimeout: 15000, // Increased for SSL connections
+    commandTimeout: 15000, // Increased for SSL connections
+    tls: {}, // Enable TLS for rediss:// URLs
+    keepAlive: 30000, // Keep connections alive
   })
 } else {
   connection = REDIS_URL ? new Redis(REDIS_URL, {
@@ -35,12 +37,14 @@ if (FALLBACK_ENABLED && FALLBACK_REDIS_URL) {
     enableReadyCheck: false,
     enableOfflineQueue: false,
     lazyConnect: true,
-    // Optimize connection to reduce request count
-    connectTimeout: 10000,
-    commandTimeout: 5000,
+    // Optimize connection for SSL/TLS
+    connectTimeout: 15000, // Increased for SSL connections
+    commandTimeout: 15000, // Increased for SSL connections
+    tls: {}, // Enable TLS for rediss:// URLs
+    keepAlive: 30000, // Keep connections alive
     retryStrategy: (times) => {
-      if (times > 3) return null; // Give up after 3 retries
-      return Math.min(times * 100, 3000);
+      if (times > 2) return null; // Reduce retries for faster fallback
+      return Math.min(times * 200, 2000);
     },
   }) : new Redis({ maxRetriesPerRequest: null, enableReadyCheck: false, enableOfflineQueue: false, lazyConnect: true })
 }

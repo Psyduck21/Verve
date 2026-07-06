@@ -12,8 +12,14 @@ export const redis = new Redis(REDIS_URL, {
   enableReadyCheck: false,
   enableOfflineQueue: false,
   lazyConnect: true,
-  connectTimeout: 10000,
-  commandTimeout: 5000,
+  connectTimeout: 15000, // Increased for SSL connections
+  commandTimeout: 15000, // Increased for SSL connections
+  tls: {}, // Enable TLS for rediss:// URLs
+  keepAlive: 30000, // Keep connections alive
+  retryStrategy: (times) => {
+    if (times > 2) return null; // Reduce retries for faster fallback
+    return Math.min(times * 200, 2000);
+  },
 })
 
 // ── Key builders (centralized to avoid typos) ─────────────────
