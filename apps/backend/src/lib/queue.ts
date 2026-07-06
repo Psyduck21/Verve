@@ -85,6 +85,9 @@ export function getRedisFallbackClient(): RedisFallbackClient | null {
   return redisFallbackClient
 }
 
+// Export the connection for backward compatibility with workers
+export { connection }
+
 export const QUEUE_NAMES = {
   NOTIFICATIONS: 'notifications-queue',
   AI_TASKS: 'ai-tasks-queue',
