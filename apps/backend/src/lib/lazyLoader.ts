@@ -106,23 +106,42 @@ export async function getRRule() {
       hasRRuleLower: !!m.rrule,
       rruleLowerType: typeof m.rrule,
       moduleType: typeof m,
-      keys: Object.keys(m)
+      keys: Object.keys(m),
+      defaultKeys: m.default ? Object.keys(m.default) : [],
+      defaultHasRRule: m.default ? !!m.default.rrule : false,
+      defaultRRuleType: m.default ? typeof m.default.rrule : 'none',
+      defaultHasRRuleUpper: m.default ? !!m.default.RRule : false,
+      defaultRRuleUpperType: m.default ? typeof m.default.RRule : 'none'
     })
     
+    // Try nested default.rrule first (based on the keys showing 'rrule' but m.rrule being undefined)
+    if (m.default && m.default.rrule && typeof m.default.rrule === 'function') {
+      console.log('Using m.default.rrule as constructor')
+      return m.default.rrule
+    }
+    // Try nested default.RRule
+    if (m.default && m.default.RRule && typeof m.default.RRule === 'function') {
+      console.log('Using m.default.RRule as constructor')
+      return m.default.RRule
+    }
     // Try named export 'rrule' first (appears to be the correct structure in v2.8.1)
     if (m.rrule && typeof m.rrule === 'function') {
+      console.log('Using m.rrule as constructor')
       return m.rrule
     }
     // Try named export 'RRule'
     if (m.RRule && typeof m.RRule === 'function') {
+      console.log('Using m.RRule as constructor')
       return m.RRule
     }
     // Try default export if it's a function
     if (m.default && typeof m.default === 'function') {
+      console.log('Using m.default as constructor')
       return m.default
     }
     // Fallback: Try direct module
     if (typeof m === 'function') {
+      console.log('Using m as constructor')
       return m
     }
     
