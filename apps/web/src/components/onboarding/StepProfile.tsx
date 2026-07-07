@@ -65,6 +65,14 @@ export function StepProfile() {
     return `${displayHour}:00 ${period}`
   }
 
+  const calculateActiveHours = (wake: number, sleep: number) => {
+    if (sleep > wake) {
+      return sleep - wake
+    } else {
+      return (24 - wake) + sleep
+    }
+  }
+
   const totalHours = sleepTime > wakeTime ? sleepTime - wakeTime : (24 - wakeTime) + sleepTime
 
   return (
