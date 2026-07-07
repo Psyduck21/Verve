@@ -9,6 +9,7 @@ export interface OnboardingData {
   wake_time?: string
   sleep_time?: string
   daily_commitment_minutes?: number
+  weekend_warrior?: boolean
   primary_focus_areas?: string[]
   priority_preference?: string
   challenge?: string

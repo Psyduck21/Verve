@@ -31,8 +31,10 @@ export class OnboardingService {
     wake_time: string
     sleep_time: string
     daily_commitment_minutes: number
+    weekend_warrior: boolean
     primary_focus_areas: string[]
     priority_preference: string
+    buffer_preference?: string
     challenge?: string
   }) {
     // Check budget
@@ -41,12 +43,25 @@ export class OnboardingService {
       throw new Error('Daily AI budget exceeded')
     }
 
+    const weekendPreference = profile.weekend_warrior 
+      ? 'User works on weekends - include tasks for Saturday and Sunday'
+      : 'User does NOT work on weekends - avoid scheduling tasks on Saturday and Sunday'
+
+    const bufferPreference = profile.buffer_preference === 'back_to_back'
+      ? 'User prefers back-to-back tasks for maximum efficiency - minimize gaps between tasks'
+      : profile.buffer_preference === 'buffer_time'
+      ? 'User prefers 5-10 minute buffer time between tasks for transitions'
+      : 'User prefers flexible task spacing - let AI decide based on context'
+
     const systemPrompt = `Generate exactly 3 distinct Daily Routine options based on the user's profile.
 Use user's schedule: wake ${profile.wake_time}, sleep ${profile.sleep_time}, ${profile.daily_commitment_minutes}min focus time.
 Focus areas: ${profile.primary_focus_areas.join(', ')}. 
 Priority: ${profile.priority_preference}.
+${weekendPreference}
+${bufferPreference}
+${profile.challenge ? `User challenges: ${profile.challenge}.` : ''}
 Make each routine unique (e.g., one balanced, one intense, one flexible). Do NOT generate absolute 'scheduled_at' times for tasks; just use duration and category.
-Return JSON strictly matching: { "routines": [ { "title": "string", "goal": "string", "icon": "string", "color": "#hex", "tasks": [ { "title": "string", "priority": "critical|high|medium|low", "estimated_duration_minutes": number, "category": "string" } ] } ] }`
+Return JSON strictly matching: { "routines": [ { "title": "string", "goal": "string", "icon": "string", "color": "#hex", "tasks": [ { "title": "string", "priority": "critical|high|medium|low", "estimated_duration_minutes": number, "category": "string" } ] } }`
 
     let userPrompt = `Timezone: ${profile.timezone}. Schedule type: ${profile.grind_type}.`
     if (profile.challenge) {

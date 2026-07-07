@@ -27,6 +27,8 @@ export function StepLearn() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         setCompletedShortcuts(prev => new Set(prev).add(0))
+        // Trigger command palette
+        window.dispatchEvent(new CustomEvent('toggle_command_palette'))
         return
       }
       
@@ -37,8 +39,12 @@ export function StepLearn() {
       if (!isInput) {
         if (e.key === '/') {
           setCompletedShortcuts(prev => new Set(prev).add(1))
+          // Trigger quick add task
+          window.dispatchEvent(new CustomEvent('toggle_command_palette'))
         } else if (e.key === '?' || (e.shiftKey && e.key === '/')) {
           setCompletedShortcuts(prev => new Set(prev).add(2))
+          // Trigger keyboard help overlay
+          window.dispatchEvent(new CustomEvent('toggle_keyboard_help'))
         }
       }
     }

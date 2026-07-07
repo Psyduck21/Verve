@@ -12,6 +12,9 @@ const CHALLENGES = [
   { id: "forgetting_tasks", title: "Forgetting tasks", desc: "Things slip through" },
   { id: "work_life_balance", title: "Work-life balance", desc: "Struggling to disconnect" },
   { id: "scheduling_conflicts", title: "Scheduling conflicts", desc: "Double bookings" },
+  { id: "procrastination", title: "Procrastination", desc: "Delaying important tasks" },
+  { id: "overwhelmed", title: "Feeling overwhelmed", desc: "Too much to do" },
+  { id: "time_management", title: "Time management", desc: "Poor time estimation" },
   { id: "none", title: "None of the above", desc: "Just want to be organized" },
 ]
 
@@ -23,7 +26,9 @@ const BUFFER_PREFERENCES = [
 
 export function StepAISetup() {
   const { collectedData, updateData } = useOnboarding()
-  const [challenge, setChallenge] = useState(collectedData.challenge || "")
+  const [selectedChallenges, setSelectedChallenges] = useState<string[]>(
+    collectedData.challenge ? [collectedData.challenge] : []
+  )
   const [bufferPreference, setBufferPreference] = useState(collectedData.buffer_preference || "flexible")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedRoutines, setGeneratedRoutines] = useState<any[]>(collectedData.generated_routines || [])
@@ -41,7 +46,8 @@ export function StepAISetup() {
     try {
       const data = await apiClient.onboarding.generateRoutine({
         ...collectedData,
-        challenge,
+        challenge: selectedChallenges.join(','),
+        buffer_preference: bufferPreference,
       })
       setGeneratedRoutines(data.data)
       setIsFallback(data.fallback || false)
@@ -54,7 +60,7 @@ export function StepAISetup() {
 
   const handleAccept = () => {
     updateData({
-      challenge,
+      challenge: selectedChallenges.join(','),
       buffer_preference: bufferPreference,
       generated_routines: generatedRoutines,
       accepted_routine: generatedRoutines[selectedRoutineIndex],
@@ -66,6 +72,18 @@ export function StepAISetup() {
     setGeneratedRoutines([])
     updateData({ generated_routines: [], accepted_routine: undefined })
     handleGenerateRoutine()
+  }
+
+  const toggleChallenge = (id: string) => {
+    setSelectedChallenges(prev => {
+      if (id === 'none') {
+        // If "none" is selected, clear all other selections
+        return prev.includes('none') ? [] : ['none']
+      }
+      // If selecting another option, remove "none" if present
+      const filtered = prev.filter(c => c !== 'none')
+      return filtered.includes(id) ? filtered.filter(c => c !== id) : [...filtered, id]
+    })
   }
 
   useEffect(() => {
@@ -80,32 +98,35 @@ export function StepAISetup() {
       {/* Challenge Selection */}
       <div className="space-y-3">
         <Label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-          What's your biggest scheduling challenge?
+          What are your biggest scheduling challenges? (Select all that apply)
         </Label>
         <div className="grid grid-cols-1 gap-2">
-          {CHALLENGES.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setChallenge(item.id)}
-              className={`flex items-center gap-3 text-left p-3 rounded-xl border transition-all ${
-                challenge === item.id
-                  ? "bg-primary/10 border-primary text-primary"
-                  : "bg-background border-border/50 hover:border-border text-foreground"
-              }`}
-            >
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                challenge === item.id ? "border-primary bg-primary" : "border-border"
-              }`}>
-                {challenge === item.id && <CheckCircle2 size={12} className="text-primary-foreground" />}
-              </div>
-              <div>
-                <span className="font-semibold text-sm block">{item.title}</span>
-                <span className={`text-xs mt-0.5 block ${challenge === item.id ? "text-primary/70" : "text-muted-foreground"}`}>
-                  {item.desc}
-                </span>
-              </div>
-            </button>
-          ))}
+          {CHALLENGES.map((item) => {
+            const isSelected = selectedChallenges.includes(item.id)
+            return (
+              <button
+                key={item.id}
+                onClick={() => toggleChallenge(item.id)}
+                className={`flex items-center gap-3 text-left p-3 rounded-xl border transition-all ${
+                  isSelected
+                    ? "bg-primary/10 border-primary text-primary"
+                    : "bg-background border-border/50 hover:border-border text-foreground"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                  isSelected ? "border-primary bg-primary" : "border-border"
+                }`}>
+                  {isSelected && <CheckCircle2 size={12} className="text-primary-foreground" />}
+                </div>
+                <div>
+                  <span className="font-semibold text-sm block">{item.title}</span>
+                  <span className={`text-xs mt-0.5 block ${isSelected ? "text-primary/70" : "text-muted-foreground"}`}>
+                    {item.desc}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 

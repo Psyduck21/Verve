@@ -8,11 +8,11 @@ import { useOnboarding } from "@/contexts/onboarding-context"
 import { Clock, Sunrise, Moon, Zap } from "lucide-react"
 
 const GRIND_TYPES = [
-  { id: "early_bird", title: "Early Bird", desc: "5 AM - 9 AM start", icon: Sunrise },
-  { id: "9_to_5", title: "9-to-5 Professional", desc: "Standard work hours", icon: Clock },
-  { id: "night_owl", title: "Night Owl", desc: "Late start, late finish", icon: Moon },
-  { id: "flexible", title: "Flexible Creator", desc: "Variable schedule", icon: Zap },
-  { id: "shift_worker", title: "Shift Worker", desc: "Rotating/irregular", icon: Clock },
+  { id: "early_bird", title: "Early Bird", desc: "5 AM - 9 AM start", icon: Sunrise, defaultWake: 5, defaultSleep: 21 },
+  { id: "9_to_5", title: "9-to-5 Professional", desc: "Standard work hours", icon: Clock, defaultWake: 7, defaultSleep: 23 },
+  { id: "night_owl", title: "Night Owl", desc: "Late start, late finish", icon: Moon, defaultWake: 10, defaultSleep: 2 },
+  { id: "flexible", title: "Flexible Creator", desc: "Variable schedule", icon: Zap, defaultWake: 8, defaultSleep: 23 },
+  { id: "shift_worker", title: "Shift Worker", desc: "Rotating/irregular", icon: Clock, defaultWake: 6, defaultSleep: 22 },
 ]
 
 const TIMEZONES = [
@@ -30,9 +30,15 @@ export function StepProfile() {
   const { collectedData, updateData } = useOnboarding()
   const [timezone, setTimezone] = useState(collectedData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [grindType, setGrindType] = useState(collectedData.grind_type || "9_to_5")
-  const [wakeTime, setWakeTime] = useState(collectedData.wake_time ? parseInt(collectedData.wake_time.split(":")[0]) : 9)
-  const [sleepTime, setSleepTime] = useState(collectedData.sleep_time ? parseInt(collectedData.sleep_time.split(":")[0]) : 22)
-  const [weekendWarrior, setWeekendWarrior] = useState(false)
+  
+  // Get default wake/sleep times from grind type
+  const selectedGrind = GRIND_TYPES.find(gt => gt.id === grindType)
+  const defaultWake = selectedGrind?.defaultWake || 7
+  const defaultSleep = selectedGrind?.defaultSleep || 23
+  
+  const [wakeTime, setWakeTime] = useState(collectedData.wake_time ? parseInt(collectedData.wake_time.split(":")[0]) : defaultWake)
+  const [sleepTime, setSleepTime] = useState(collectedData.sleep_time ? parseInt(collectedData.sleep_time.split(":")[0]) : defaultSleep)
+  const [weekendWarrior, setWeekendWarrior] = useState(collectedData.weekend_warrior || false)
 
   useEffect(() => {
     updateData({
@@ -40,8 +46,18 @@ export function StepProfile() {
       grind_type: grindType,
       wake_time: `${wakeTime.toString().padStart(2, '0')}:00:00`,
       sleep_time: `${sleepTime.toString().padStart(2, '0')}:00:00`,
+      weekend_warrior: weekendWarrior,
     })
-  }, [timezone, grindType, wakeTime, sleepTime])
+  }, [timezone, grindType, wakeTime, sleepTime, weekendWarrior])
+
+  // Update wake/sleep times when grind type changes
+  useEffect(() => {
+    const selectedGrind = GRIND_TYPES.find(gt => gt.id === grindType)
+    if (selectedGrind) {
+      setWakeTime(selectedGrind.defaultWake)
+      setSleepTime(selectedGrind.defaultSleep)
+    }
+  }, [grindType])
 
   const formatTime = (hour: number) => {
     const period = hour >= 12 ? "PM" : "AM"
@@ -49,7 +65,7 @@ export function StepProfile() {
     return `${displayHour}:00 ${period}`
   }
 
-  const totalHours = sleepTime > wakeTime ? sleepTime - wakeTime : 24 - wakeTime + sleepTime
+  const totalHours = sleepTime > wakeTime ? sleepTime - wakeTime : (24 - wakeTime) + sleepTime
 
   return (
     <div className="space-y-8">
@@ -148,6 +164,11 @@ export function StepProfile() {
             </SelectTrigger>
             <SelectContent className="rounded-xl border-border/50">
               {Array.from({ length: 8 }, (_, i) => i + 20).map((hour) => (
+                <SelectItem key={hour} value={hour.toString()}>
+                  {formatTime(hour)}
+                </SelectItem>
+              ))}
+              {Array.from({ length: 6 }, (_, i) => i).map((hour) => (
                 <SelectItem key={hour} value={hour.toString()}>
                   {formatTime(hour)}
                 </SelectItem>

@@ -12,8 +12,11 @@ export interface UserProfile {
   sleep_time: string
   daily_commitment_minutes: number
   grind_type: string
+  weekend_warrior: boolean
   primary_focus_areas: string[]
   priority_preference: string
+  challenge?: string
+  buffer_preference?: string
   onboarding_completed: boolean
 }
 
@@ -45,8 +48,11 @@ export class UserProfileService {
           sleep_time: true,
           daily_commitment_minutes: true,
           grind_type: true,
+          weekend_warrior: true,
           primary_focus_areas: true,
           priority_preference: true,
+          challenge: true,
+          buffer_preference: true,
           onboarding_completed: true,
         },
       })
@@ -64,8 +70,11 @@ export class UserProfileService {
         sleep_time: user.sleep_time,
         daily_commitment_minutes: user.daily_commitment_minutes,
         grind_type: user.grind_type,
+        weekend_warrior: user.weekend_warrior || false,
         primary_focus_areas: user.primary_focus_areas as string[],
         priority_preference: user.priority_preference,
+        challenge: user.challenge,
+        buffer_preference: user.buffer_preference,
         onboarding_completed: user.onboarding_completed,
       }
 
@@ -109,12 +118,17 @@ USER PROFILE:
 - Sleep Time: ${profile.sleep_time}
 - Daily Commitment: ${profile.daily_commitment_minutes} minutes
 - Schedule Type: ${profile.grind_type}
+- Weekend Warrior: ${profile.weekend_warrior ? 'Yes' : 'No'}
 - Focus Areas: ${profile.primary_focus_areas.join(', ') || 'None specified'}
 - Priority Preference: ${profile.priority_preference}
+- Challenges: ${profile.challenge || 'None specified'}
+- Buffer Preference: ${profile.buffer_preference || 'Flexible'}
 - Onboarding Completed: ${profile.onboarding_completed}
 
 SCHEDULING CONSTRAINTS:
 - All tasks MUST be scheduled between ${profile.wake_time} and ${profile.sleep_time}
+- ${profile.weekend_warrior ? 'User works on weekends - schedule tasks on Saturday and Sunday' : 'User does NOT work on weekends - avoid scheduling tasks on Saturday and Sunday'}
+- ${profile.buffer_preference === 'back_to_back' ? 'User prefers back-to-back tasks for maximum efficiency - minimize gaps between tasks' : profile.buffer_preference === 'buffer_time' ? 'User prefers 5-10 minute buffer time between tasks for transitions' : 'User prefers flexible task spacing - let AI decide based on context'}
 - Work tasks should prioritize business hours when possible
 - Personal tasks can be scheduled during any awake hours
 - Health tasks should respect user's daily commitment limits
@@ -178,5 +192,31 @@ SCHEDULING CONSTRAINTS:
     }
 
     return workHoursMap[grindType] || { start: '09:00:00', end: '17:00:00' }
+  }
+
+  /**
+   * Check if a date falls on a weekend (Saturday or Sunday)
+   */
+  static isWeekend(date: Date): boolean {
+    const day = date.getDay()
+    return day === 0 || day === 6 // 0 = Sunday, 6 = Saturday
+  }
+
+  /**
+   * Check if scheduling is allowed for a given date based on weekend warrior preference
+   */
+  static async isWeekendSchedulingAllowed(userId: string, scheduledDate: Date): Promise<boolean> {
+    const profile = await this.getUserProfile(userId)
+    if (!profile) {
+      return true // Default to allowed if profile not found
+    }
+
+    // If it's not a weekend, always allow
+    if (!this.isWeekend(scheduledDate)) {
+      return true
+    }
+
+    // If it's a weekend, check if user is a weekend warrior
+    return profile.weekend_warrior
   }
 }

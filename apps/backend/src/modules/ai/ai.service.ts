@@ -95,13 +95,23 @@ Answers: ${JSON.stringify(body.answers)}`
         schema: GeneratedRoutineSchema,
       })
 
-      // Validate scheduled times are within user's awake hours
+      // Validate scheduled times are within user's awake hours and respect weekend preferences
       if (aiResponse.data?.tasks && userProfile) {
         for (const task of aiResponse.data.tasks) {
           if (task.scheduled_at) {
             const isValidTime = await UserProfileService.isValidScheduleTimeWithProfile(userId, task.scheduled_at)
             if (!isValidTime) {
               logger.warn(`AI generated routine task outside awake hours: ${task.scheduled_at}`)
+              // Remove the scheduled_at to make it unscheduled rather than invalid
+              delete (task as any).scheduled_at
+              continue
+            }
+
+            // Check weekend scheduling preference
+            const scheduledDate = new Date(task.scheduled_at)
+            const isWeekendAllowed = await UserProfileService.isWeekendSchedulingAllowed(userId, scheduledDate)
+            if (!isWeekendAllowed) {
+              logger.warn(`AI generated routine task on weekend when user is not a weekend warrior: ${task.scheduled_at}`)
               // Remove the scheduled_at to make it unscheduled rather than invalid
               delete (task as any).scheduled_at
             }

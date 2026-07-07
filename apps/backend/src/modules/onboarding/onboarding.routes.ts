@@ -28,8 +28,11 @@ const OnboardingStepSchema = z.object({
     wake_time: z.string().optional(),
     sleep_time: z.string().optional(),
     daily_commitment_minutes: z.number().optional(),
+    weekend_warrior: z.boolean().optional(),
     primary_focus_areas: z.array(z.string()).optional(),
     priority_preference: z.string().optional(),
+    challenge: z.string().optional(),
+    buffer_preference: z.string().optional(),
   }).optional(),
   duration_ms: z.number().optional(),
 })
@@ -40,8 +43,10 @@ const GenerateRoutineSchema = z.object({
   wake_time: z.string(),
   sleep_time: z.string(),
   daily_commitment_minutes: z.number(),
+  weekend_warrior: z.boolean(),
   primary_focus_areas: z.array(z.string()),
   priority_preference: z.string(),
+  buffer_preference: z.string().optional(),
   challenge: z.string().optional(),
 })
 
@@ -100,8 +105,11 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
       wake_time: users.wake_time,
       sleep_time: users.sleep_time,
       daily_commitment_minutes: users.daily_commitment_minutes,
+      weekend_warrior: users.weekend_warrior,
       primary_focus_areas: users.primary_focus_areas,
       priority_preference: users.priority_preference,
+      challenge: users.challenge,
+      buffer_preference: users.buffer_preference,
     }).from(users).where(eq(users.id, user.id))
     
     if (!profile.length) {
@@ -122,8 +130,11 @@ export const onboardingRoutes: FastifyPluginAsync = async (app) => {
           wake_time: profile[0].wake_time,
           sleep_time: profile[0].sleep_time,
           daily_commitment_minutes: profile[0].daily_commitment_minutes,
+          weekend_warrior: profile[0].weekend_warrior,
           primary_focus_areas: profile[0].primary_focus_areas,
           priority_preference: profile[0].priority_preference,
+          challenge: profile[0].challenge,
+          buffer_preference: profile[0].buffer_preference,
         }
       }
     })
