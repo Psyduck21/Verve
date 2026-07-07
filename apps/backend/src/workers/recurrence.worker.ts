@@ -92,18 +92,34 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
                 let parsedRule
                 let RRuleConstructor
                 
-                if (typeof RRule.fromString === 'function') {
+                if (typeof RRule === 'function') {
+                  // RRule is a constructor/function
+                  parsedRule = new RRule(ruleKey)
+                  RRuleConstructor = RRule
+                } else if (typeof RRule.fromString === 'function') {
                   parsedRule = RRule.fromString(ruleKey)
                   RRuleConstructor = RRule
+                } else if (RRule.RRule && typeof RRule.RRule === 'function') {
+                  parsedRule = new RRule.RRule(ruleKey)
+                  RRuleConstructor = RRule.RRule
                 } else if (RRule.RRule && typeof RRule.RRule.fromString === 'function') {
                   parsedRule = RRule.RRule.fromString(ruleKey)
                   RRuleConstructor = RRule.RRule
+                } else if (RRule.default && typeof RRule.default === 'function') {
+                  parsedRule = new RRule.default(ruleKey)
+                  RRuleConstructor = RRule.default
                 } else if (RRule.default && typeof RRule.default.fromString === 'function') {
                   parsedRule = RRule.default.fromString(ruleKey)
                   RRuleConstructor = RRule.default
                 } else {
-                  app.log.error(`RRule module structure not recognized for task ${record.task.id}`)
-                  continue
+                  // Try to use the module as-is with direct construction
+                  try {
+                    parsedRule = new RRule(ruleKey)
+                    RRuleConstructor = RRule
+                  } catch (e) {
+                    app.log.error(`RRule module structure not recognized for task ${record.task.id}`)
+                    continue
+                  }
                 }
                 
                 if (!parsedRule || typeof parsedRule.origOptions === 'undefined') {

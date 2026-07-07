@@ -12,16 +12,33 @@ export async function validateRecurrenceRule(rule: string): Promise<{ valid: boo
   try {
     const RRule = await getRRule()
     
-    // Handle different RRule module structures
+    // Handle different RRule module structures more flexibly
     let parsed
-    if (typeof RRule.fromString === 'function') {
+    if (typeof RRule === 'function') {
+      // RRule is a constructor/function
+      parsed = new RRule(rule)
+    } else if (typeof RRule.fromString === 'function') {
+      // RRule has fromString method
       parsed = RRule.fromString(rule)
+    } else if (RRule.RRule && typeof RRule.RRule === 'function') {
+      // RRule.RRule is the constructor
+      parsed = new RRule.RRule(rule)
     } else if (RRule.RRule && typeof RRule.RRule.fromString === 'function') {
+      // RRule.RRule has fromString method
       parsed = RRule.RRule.fromString(rule)
+    } else if (RRule.default && typeof RRule.default === 'function') {
+      // RRule.default is the constructor
+      parsed = new RRule.default(rule)
     } else if (RRule.default && typeof RRule.default.fromString === 'function') {
+      // RRule.default has fromString method
       parsed = RRule.default.fromString(rule)
     } else {
-      return { valid: false, error: 'RRule module structure not recognized' }
+      // Try to use the module as-is with direct construction
+      try {
+        parsed = new RRule(rule)
+      } catch (e) {
+        return { valid: false, error: 'RRule module structure not recognized' }
+      }
     }
     
     if (!parsed || typeof parsed.origOptions === 'undefined') {
