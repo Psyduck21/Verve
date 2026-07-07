@@ -98,6 +98,15 @@ export async function getRRule() {
   RRulePromise = import('rrule').then(m => {
     // Handle different RRule module structures for rrule v2.8.1
     // In rrule v2.8.1, the module exports the RRule class as default
+    console.log('RRule module structure:', {
+      hasDefault: !!m.default,
+      defaultType: typeof m.default,
+      hasRRule: !!m.RRule,
+      rruleType: typeof m.RRule,
+      moduleType: typeof m,
+      keys: Object.keys(m)
+    })
+    
     if (m.default && typeof m.default === 'function') {
       return m.default
     }
