@@ -61,7 +61,7 @@ class RedisFallbackClient {
       name: config.primary.name,
       client: new Redis(config.primary.url, {
         maxRetriesPerRequest: null,
-        enableReadyCheck: false,
+        enableReadyCheck: true, // Enable ready check to ensure connection is established
         enableOfflineQueue: false,
         lazyConnect: true,
         connectTimeout: 15000, // Increased for SSL connections
@@ -80,7 +80,7 @@ class RedisFallbackClient {
       name: config.fallback.name,
       client: new Redis(config.fallback.url, {
         maxRetriesPerRequest: null,
-        enableReadyCheck: false,
+        enableReadyCheck: true, // Enable ready check to ensure connection is established
         enableOfflineQueue: false,
         lazyConnect: true,
         connectTimeout: 15000, // Increased for SSL connections
@@ -213,6 +213,12 @@ class RedisFallbackClient {
 
   private async performHealthCheck(instance: RedisInstance): Promise<boolean> {
     try {
+      // Check if connection is ready before pinging
+      if (!instance.client.status || instance.client.status !== 'ready') {
+        this.logger.warn({ instance: instance.name, status: instance.client.status }, 'Redis connection not ready, skipping health check')
+        return false
+      }
+
       const result = await instance.client.ping()
       instance.lastHealthCheck = new Date()
       instance.healthy = true
