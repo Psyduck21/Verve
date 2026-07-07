@@ -111,6 +111,14 @@ export function startRecurrenceWorker(app: FastifyInstance): Worker {
                 } else if (RRule.default && typeof RRule.default.fromString === 'function') {
                   parsedRule = RRule.default.fromString(ruleKey)
                   RRuleConstructor = RRule.default
+                } else if (RRule.rrule && typeof RRule.rrule === 'function') {
+                  // RRule.rrule is the constructor (for v2.8.1 structure)
+                  parsedRule = new RRule.rrule(ruleKey)
+                  RRuleConstructor = RRule.rrule
+                } else if (RRule.rrule && typeof RRule.rrule.fromString === 'function') {
+                  // RRule.rrule has fromString method
+                  parsedRule = RRule.rrule.fromString(ruleKey)
+                  RRuleConstructor = RRule.rrule
                 } else {
                   // Try to use the module as-is with direct construction
                   try {

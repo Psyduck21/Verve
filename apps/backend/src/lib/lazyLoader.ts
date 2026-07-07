@@ -103,16 +103,23 @@ export async function getRRule() {
       defaultType: typeof m.default,
       hasRRule: !!m.RRule,
       rruleType: typeof m.RRule,
+      hasRRuleLower: !!m.rrule,
+      rruleLowerType: typeof m.rrule,
       moduleType: typeof m,
       keys: Object.keys(m)
     })
     
-    if (m.default && typeof m.default === 'function') {
-      return m.default
+    // Try named export 'rrule' first (appears to be the correct structure in v2.8.1)
+    if (m.rrule && typeof m.rrule === 'function') {
+      return m.rrule
     }
-    // Fallback: Try named export
+    // Try named export 'RRule'
     if (m.RRule && typeof m.RRule === 'function') {
       return m.RRule
+    }
+    // Try default export if it's a function
+    if (m.default && typeof m.default === 'function') {
+      return m.default
     }
     // Fallback: Try direct module
     if (typeof m === 'function') {

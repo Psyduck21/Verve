@@ -48,6 +48,14 @@ export async function validateRecurrenceRule(rule: string): Promise<{ valid: boo
       // RRule.default has fromString method
       console.log('Using RRule.default.fromString')
       parsed = RRule.default.fromString(rule)
+    } else if (RRule.rrule && typeof RRule.rrule === 'function') {
+      // RRule.rrule is the constructor (for v2.8.1 structure)
+      console.log('Using RRule.rrule as constructor')
+      parsed = new RRule.rrule(rule)
+    } else if (RRule.rrule && typeof RRule.rrule.fromString === 'function') {
+      // RRule.rrule has fromString method
+      console.log('Using RRule.rrule.fromString')
+      parsed = RRule.rrule.fromString(rule)
     } else {
       // Try to use the module as-is with direct construction
       console.log('Trying to use RRule module as-is')
